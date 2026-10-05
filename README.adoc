@@ -1,0 +1,43 @@
+= ancora
+
+Ancora (Latin: *anchor*) is the dependency-ordered release-wave orchestrator for gem
+fleets — metanorma, lutaml, relaton, glossarist — each chain running the same engine
+from its own repo.
+
+One invariant governs everything: *rubygems, CI runs, and git tags are the only
+truth*. Every piece of ancora state is a cache over those oracles, so a crash at any
+point resumes by re-querying them, and nothing ever double-publishes.
+
+== Waves
+
+A wave is planned as antichains of the fleet's dependency graph, leaves first and the
+terminus last (`metanorma-cli` for the metanorma chain). The lifecycle:
+
+----
+planned -> candidate -> gating -> promoted -> done
+----
+
+* *candidate*: every gem in the wave gets an auto-numbered prerelease
+  `X.Y.Z.pre.alpha.N` — invisible to default resolvers, so a broken wave costs
+  nothing publicly.
+* *gating*: the integration harness generates a lock pinning the ENTIRE candidate set
+  and runs each next-wave gem's suite plus a canary corpus (a real document compiled
+  end-to-end through presentation/site rendering) against it.
+* *attempts*: a failed gate spawns candidate attempt K+1 — only for gems whose main
+  changed; counters are per (gem, semver target); bounded by `max_attempts`.
+* *promoted*: the first fully-green attempt migrates to finals in wave order; floors
+  are raised to finals, never to prereleases; the terminus releases last with the
+  wave manifest in its notes.
+
+== Dry run (M1)
+
+----
+bundle exec exe/ancora plan --network network.json --delta delta.json
+bundle exec exe/ancora plan --network network.json --seeds metanorma-standoc
+bundle exec exe/ancora check metanorma-plugin-lutaml 0.7.54
+----
+
+== Status
+
+M1 skeleton. See TODO.md for the roadmap (M1–M5) and the design of record in
+ORCHESTRATOR-PLAN.md at the fleet-audit workspace.
