@@ -1,0 +1,18 @@
+# House CI: pins the metanorma/ci reusable rake workflow at @v1 (moving
+# major, three-tier tagging discipline per metanorma/ci#372).
+name: rake
+
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ v* ]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  rake:
+    uses: metanorma/ci/.github/workflows/generic-rake.yml@v1
+    secrets:
+      pat_token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
