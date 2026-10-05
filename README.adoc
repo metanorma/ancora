@@ -67,7 +67,13 @@ bundle exec exe/ancora plan --network network.json --chain examples/metanorma.ch
 bundle exec exe/ancora pin --chain examples/metanorma.chain.yml --network network.json --delta delta.json
 bundle exec exe/ancora drift --network network.json --delta delta.json
 bundle exec exe/ancora check metanorma-plugin-lutaml 0.7.54
+bundle exec exe/ancora tag metanorma/metanorma-cli 1.17.0
+bundle exec exe/ancora ci metanorma/metanorma-cli
 ----
+
+`check`, `tag`, and `ci` query the three read-only oracles the engine trusts:
+the rubygems versions API, git tags, and CI runs. Nothing in ancora writes to
+them; the wave state machine is a cache over them.
 
 `drift` reports the four standing findings over the fleet or a single chain:
 floorless edges, stale pins (floors that no longer admit the dependency's

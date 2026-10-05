@@ -10,6 +10,8 @@ module Ancora
   #   ancora plan --network network.json --chain chain.yml --seeds gem
   #   ancora pin --chain chain.yml --network network.json --delta delta.json
   #   ancora check metanorma-plugin-lutaml 0.7.54
+  #   ancora tag metanorma/metanorma-cli 1.17.0
+  #   ancora ci metanorma/metanorma-cli
   class CLI
     def self.run(argv)
       new(argv).run
@@ -26,6 +28,8 @@ module Ancora
       when "pin" then return pin
       when "drift" then drift
       when "check" then check
+      when "tag" then tag
+      when "ci" then ci
       else return usage
       end
       0
@@ -106,6 +110,31 @@ module Ancora
       puts "#{gem} #{version}: #{state}"
     end
 
+    def tag
+      repo = @argv.shift
+      version = @argv.shift
+      return usage unless repo && version
+
+      oracle = Oracle::Github.new
+      state = oracle.tagged_version?(repo, version) ? "tagged" : "NOT tagged"
+      puts "#{repo} v#{version}: #{state}"
+    end
+
+    def ci
+      repo = @argv.shift
+      branch = @argv.shift || "main"
+      return usage unless repo
+
+      run = Oracle::Github.new.latest_run(repo, branch: branch)
+      unless run
+        puts "#{repo} #{branch}: no run"
+        return
+      end
+
+      puts "#{repo} #{branch}: #{run['name']} #{run['conclusion'] || run['status']} " \
+           "#{run['head_sha'][0, 8]} #{run['html_url']}"
+    end
+
     def parse_graph_options(options)
       OptionParser.new do |o|
         o.on("--network PATH") { |v| options[:network] = v }
@@ -126,6 +155,8 @@ module Ancora
       warn "       ancora pin --chain chain.yml --network PATH [--delta PATH]"
       warn "       ancora drift --network PATH [--delta PATH] [--chain chain.yml]"
       warn "       ancora check GEM VERSION"
+      warn "       ancora tag OWNER/REPO VERSION"
+      warn "       ancora ci OWNER/REPO [BRANCH]"
       1
     end
   end

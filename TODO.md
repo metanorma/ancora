@@ -52,7 +52,12 @@ Test the CLI against the live collector data:
 - [x] Planner terminus assertion: the configured terminus (e.g. metanorma-cli) must be
       alone in the final wave; error otherwise (applies whenever the plan reaches the
       terminus; chains may declare no terminus — lutaml is a fan, `examples/lutaml.chain.yml`)
-- [ ] Oracle: GitHub CI-run oracle + git-tag oracle (read-only; `gh run` JSON)
+- [x] Oracle: GitHub CI-run oracle + git-tag oracle (read-only; `gh run` JSON)
+      (`Oracle::Github#tagged_version?` / `#green?` over the actions API, rake workflow
+      as the release gate; CLI `ancora tag` / `ancora ci`; live-verified 2026-10-05)
+
+M1 COMPLETE (2026-10-05): graph + planner + chain.yml + oracles (rubygems/tags/CI) +
+candidate numbering + manifest + gate lock + drift radar + dry-run CLI + CI/rubocop.
 
 Chain config of record (2026-10-05): `metanorma-cli` pins the whole metanorma chain
 (orgs+roots closure), `relaton-cli` pins the relaton chain via the relaton/relaton-cli
