@@ -18,7 +18,7 @@ module Ancora
 
     Unit = Struct.new(:repo, :gems, keyword_init: true)
 
-    TOP_LEVEL_KEYS = %w[name inventory monorepos terminus].freeze
+    TOP_LEVEL_KEYS = %w[name inventory monorepos terminus max_attempts].freeze
     INVENTORY_KEYS = %w[orgs roots gems exclude].freeze
 
     def self.load(path)
@@ -45,7 +45,17 @@ module Ancora
         exclude: string_array("#{path}: inventory: exclude", inv["exclude"]),
         monorepos: monorepos(path, data["monorepos"]),
         terminus: string_array("#{path}: terminus", data["terminus"]),
+        max_attempts: max_attempts(path, data["max_attempts"]),
       )
+    end
+
+    def self.max_attempts(path, value)
+      return nil if value.nil?
+      unless value.is_a?(Integer) && value.positive?
+        raise ConfigError, "#{path}: max_attempts must be a positive integer"
+      end
+
+      value
     end
 
     def self.reject_unknown_keys(where, keys, allowed)
@@ -74,12 +84,15 @@ module Ancora
         [repo, string_array("#{path}: monorepos:", gems)]
       end
     end
-    private_class_method :reject_unknown_keys, :string_array, :monorepos
+    private_class_method :reject_unknown_keys, :string_array, :monorepos,
+                         :max_attempts
 
-    attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos
+    # how many gate attempts a wave gets before the machine halts for
+    # humans; nil falls back to the machine default
+    attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos, :max_attempts
 
     def initialize(name:, orgs: [], roots: [], gems: [], exclude: [], monorepos: {},
-                   terminus: [])
+                   terminus: [], max_attempts: nil)
       @name = name
       @orgs = orgs.freeze
       @roots = roots.freeze
@@ -87,6 +100,7 @@ module Ancora
       @exclude = exclude.freeze
       @monorepos = monorepos.freeze
       @terminus_gems = terminus.freeze
+      @max_attempts = max_attempts
     end
 
     # The gems this chain manages and pins as a whole, resolved against

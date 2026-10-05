@@ -30,6 +30,7 @@ module Ancora
       when "check" then check
       when "tag" then tag
       when "ci" then ci
+      when "step" then return step
       else return usage
       end
       0
@@ -110,6 +111,43 @@ module Ancora
       puts "#{gem} #{version}: #{state}"
     end
 
+    # one transition per invocation: the dry-run of the step-per-run
+    # state machine. Prints the action a runtime run would execute and
+    # commits the manifest cache when --manifest is given.
+    def step
+      options = { delta: nil, seeds: [], chain: nil, manifest: nil }
+      parse_graph_options(options)
+
+      chain = load_chain(options)
+      return 1 unless chain
+
+      graph = Graph.load(options.fetch(:network), options[:delta])
+      path = options[:manifest]
+      manifest = path ? Manifest.load(path, chain.name) : Manifest.new(chain.name)
+      action = Machine.new(chain: chain, graph: graph,
+                           oracle: Oracle::Rubygems.new).step(manifest)
+      puts "state: #{manifest.state}"
+      render_action(action)
+      manifest.write(path) if path
+      nil
+    end
+
+    def render_action(action)
+      case action
+      when Machine::DispatchWave
+        puts "dispatch wave #{action.index + 1}:"
+        action.items.each { |i| puts "  #{i.gem} #{i.version} (#{i.repo})" }
+      when Machine::Gate
+        puts "gate attempt #{action.attempt_index}: lock the candidate set " \
+             "(ancora pin), run suites + canary, then record green/red"
+      when Machine::PromoteWave
+        puts "promote wave #{action.index + 1} finals:"
+        action.items.each { |i| puts "  #{i.gem} #{i.version} (#{i.repo})" }
+      when Machine::Halt then puts "HALT: #{action.reason}"
+      when Machine::Done then puts "wave done"
+      end
+    end
+
     def tag
       repo = @argv.shift
       version = @argv.shift
@@ -141,6 +179,7 @@ module Ancora
         o.on("--delta PATH") { |v| options[:delta] = v }
         o.on("--seeds a,b,c") { |v| options[:seeds] = v.split(",") }
         o.on("--chain PATH") { |v| options[:chain] = v }
+        o.on("--manifest PATH") { |v| options[:manifest] = v }
       end.parse!(@argv)
     end
 
@@ -157,6 +196,7 @@ module Ancora
       warn "       ancora check GEM VERSION"
       warn "       ancora tag OWNER/REPO VERSION"
       warn "       ancora ci OWNER/REPO [BRANCH]"
+      warn "       ancora step --chain chain.yml --network PATH --delta PATH [--manifest PATH]"
       1
     end
   end

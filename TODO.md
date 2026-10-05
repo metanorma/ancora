@@ -70,9 +70,15 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 - [ ] `metanorma/release` repo: `chain.yml` config (inventory, roots/terminus,
       candidate set, soak window, promote approval, gate commands, ruby matrix,
       external chains with needs) + the `release-wave` workflow (inputs: wave, dry_run)
-- [ ] Step-per-run state machine: one workflow run performs ONE transition (dispatch,
+      — the config SURFACE (chain.yml schema) and its engine consumption exist here;
+      the repo + workflow do not yet
+- [x] Step-per-run state machine: one workflow run performs ONE transition (dispatch,
       poll, gate step, promote step), commits the manifest, exits; next step continues
       via workflow_dispatch/schedule — waves exceed the 6h single-run limit
+      (`lib/ancora/machine.rb`: actions are data — DispatchWave/Gate/PromoteWave/Halt/
+      Done; targets come from owner data, never invented; attempts renumber only
+      changed gems; promotion migrates the first green attempt in wave order, terminus
+      last; max_attempts halt; `ancora step` is the dry-run; live-verified 2026-10-05)
 - [ ] Manifest repo as the lock: push conflicts -> rebase and retry; duplicate
       dispatches are safe (push guard no-ops, probe-verified 2026-10-05)
 - [ ] Secrets: the orchestrator dispatches each gem's OWN rubygems-release.yml

@@ -146,4 +146,13 @@ module FleetFixture
       gems: [glossarist]
     terminus: [glossarist]
   YAML
+
+  # Loads a chain.yml from its text, for specs that vary the config.
+  def self.load_chain(yaml)
+    Tempfile.create(["chain", ".yml"]) do |f|
+      f.write(yaml)
+      f.flush
+      return Ancora::Chain.load(f.path)
+    end
+  end
 end

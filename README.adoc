@@ -79,7 +79,26 @@ them; the wave state machine is a cache over them.
 floorless edges, stale pins (floors that no longer admit the dependency's
 main), prerelease floors (the lint class), and unreleased main.
 
+== The step-per-run state machine
+
+Waves exceed any single workflow-run time limit, so the runtime performs ONE
+transition per run: `ancora step` loads the manifest, queries the oracles,
+returns the one action a runtime run would execute (dispatch a wave's
+candidates, gate the pinned set, promote a wave's finals, halt), and commits
+the manifest back. A crash at any point resumes by re-querying the oracles;
+duplicate dispatches are no-ops by the release workflows' push guards. The
+machine never invents versions: candidate targets come from the owner's data
+(the gemspec on main, or an approved advisory), and the engine only numbers
+candidates against the rubygems oracle.
+
+----
+bundle exec exe/ancora step --chain examples/metanorma.chain.yml \
+  --network network.json --delta delta.json --manifest state/waves.json
+----
+
 == Status
 
-M1 skeleton. See TODO.md for the roadmap (M1–M5) and the design of record in
+M1 complete; M2 engine core (state machine + manifest commit-back) done. The
+per-org release repos (metanorma/release et al) wire the same engine into GHA.
+See TODO.md for the roadmap (M2–M5) and the design of record in
 ORCHESTRATOR-PLAN.md at the fleet-audit workspace.
