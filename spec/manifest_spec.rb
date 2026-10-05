@@ -9,7 +9,7 @@ RSpec.describe Ancora::Manifest do
     Dir.mktmpdir do |dir|
       path = File.join(dir, "state", "waves.json")
       described_class.new("metanorma").open_attempt(
-        { "ea" => "0.6.42.pre.alpha.1" }
+        { "ea" => "0.6.42.pre.alpha.1" },
       ).gate!.write(path)
       reloaded = described_class.load(path)
       expect(reloaded.chain).to eq "metanorma"

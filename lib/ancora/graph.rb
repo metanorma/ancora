@@ -23,12 +23,12 @@ module Ancora
       delta.each_value { |v| delta_by_gem[v["gem"]] = v }
 
       nodes = {}
-      network.each_value do |g|
+      network.each do |repo, g|
         next unless g["name"]
 
         d = delta_by_gem[g["name"]] || {}
         nodes[g["name"]] = Node.new(
-          name: g["name"], repo: d["repo"],
+          name: g["name"], repo: d["repo"] || repo,
           main_version: d["main_version"] || g["main_version"],
           released: d["released"], ahead_by: d["ahead_by"]
         )

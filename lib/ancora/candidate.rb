@@ -12,7 +12,7 @@ module Ancora
     end
 
     def self.target_of(version)
-      version[/\A(.+)#{Regexp.escape(PREFIX)}\d+\z/, 1]
+      version[/\A(.+)#{Regexp.escape(PREFIX)}\d+\z/o, 1]
     end
 
     def self.candidate?(version)

@@ -22,7 +22,10 @@ module Ancora
       def next_candidate_index(gem, target)
         prefix = "#{target}.pre.alpha."
         versions(gem)
-          .filter_map { |v| v["number"][/\A#{Regexp.escape(prefix)}(\d+)\z/, 1] }
+          .filter_map do |v|
+          v["number"][/\A#{Regexp.escape(prefix)}(\d+)\z/,
+                      1]
+        end
           .map(&:to_i).max.to_i
       end
 
@@ -33,7 +36,7 @@ module Ancora
         @versions[gem] ||= begin
           uri = URI(format(VERSIONS_URL, gem))
           res = @http.start(uri.host, uri.port, use_ssl: true, open_timeout: 10,
-            read_timeout: 30) { |h| h.get(uri.request_uri) }
+                                                read_timeout: 30) { |h| h.get(uri.request_uri) }
           res.is_a?(Net::HTTPSuccess) ? JSON.parse(res.body) : []
         rescue StandardError
           []

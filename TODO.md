@@ -39,14 +39,26 @@ Test the CLI against the live collector data:
 
 ## M1 remaining (finish before anything else)
 
-- [ ] CI workflow (rake matrix like the org's gems; rubocop to house style)
-- [ ] `ancora drift` subcommand: floorless edges + stale pins + unreleased main as a
-      report (this becomes cimas-drift-audit class (h) later)
-- [ ] Graph monorepo modeling: repo -> gem-set units (relaton ships relaton +
+- [x] CI workflow (rake matrix like the org's gems; rubocop to house style:
+      metanorma/ci generic-rake.yml@v1 reusable workflow + oss-guides rubocop
+      with rubocop-rspec/performance/rake plugins; remaining Metrics/RSpec
+      offenses grandfathered in .rubocop_todo.yml per fleet practice)
+- [x] `ancora drift` subcommand: floorless edges + stale pins + prerelease floors +
+      unreleased main as a report (this becomes cimas-drift-audit class (h) later;
+      live run 2026-10-05 reproduces REPORT.md: 37 floorless, 7 stale pins, 55 unreleased)
+- [x] Graph monorepo modeling: repo -> gem-set units (relaton ships relaton +
       relaton-cli; pubid ships many) — waves version the repo, floors expand to the set
-- [ ] Planner terminus assertion: the configured terminus (e.g. metanorma-cli) must be
-      alone in the final wave; error otherwise
+      (`lib/ancora/chain.rb`, `monorepos:` in chain.yml; examples/ has all four chains)
+- [x] Planner terminus assertion: the configured terminus (e.g. metanorma-cli) must be
+      alone in the final wave; error otherwise (applies whenever the plan reaches the
+      terminus; chains may declare no terminus — lutaml is a fan, `examples/lutaml.chain.yml`)
 - [ ] Oracle: GitHub CI-run oracle + git-tag oracle (read-only; `gh run` JSON)
+
+Chain config of record (2026-10-05): `metanorma-cli` pins the whole metanorma chain
+(orgs+roots closure), `relaton-cli` pins the relaton chain via the relaton/relaton-cli
+monorepo unit (+pubid org riding it), glossarist is a single-gem chain (explicit gems,
+works with no collector node), lutaml is a whole-org fan with no terminus (the lutaml
+gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 ## M2 — GHA runtime wiring
 

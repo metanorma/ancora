@@ -29,13 +29,49 @@ planned -> candidate -> gating -> promoted -> done
   are raised to finals, never to prereleases; the terminus releases last with the
   wave manifest in its notes.
 
+== Chains
+
+A chain is configured entirely in a `chain.yml` (per-org release repo;
+examples in `examples/`) — the engine knows nothing org-specific:
+
+----
+name: metanorma
+inventory:
+  orgs: [metanorma]
+  roots: [metanorma-cli]        # restrict to the terminus's closure
+monorepos:
+  relaton/relaton-cli: [relaton, relaton-cli]
+terminus: [metanorma-cli]
+----
+
+* *inventory*: the managed set — org gems (optionally restricted to root
+  closures) plus explicit gems (which need no graph node).
+* *monorepos*: repo -> gem-set release units — waves version the repo, and
+  floors expand to the set (relaton ships `relaton` + `relaton-cli` from one
+  repo; both are pinned together).
+* *terminus*: the gem a wave must culminate in, alone in the final wave —
+  expanded through its monorepo unit. A chain may declare none: the lutaml
+  fleet is a fan whose CLI covers only part of the org, so its waves are
+  antichains with no single culminating release.
+
+The four chains: metanorma (terminus `metanorma-cli`), relaton (terminus
+`relaton-cli`, monorepo unit), glossarist (single-gem library chain, terminus
+is the gem), lutaml (whole-org fan, no terminus).
+
 == Dry run (M1)
 
 ----
 bundle exec exe/ancora plan --network network.json --delta delta.json
 bundle exec exe/ancora plan --network network.json --seeds metanorma-standoc
+bundle exec exe/ancora plan --network network.json --chain examples/metanorma.chain.yml
+bundle exec exe/ancora pin --chain examples/metanorma.chain.yml --network network.json --delta delta.json
+bundle exec exe/ancora drift --network network.json --delta delta.json
 bundle exec exe/ancora check metanorma-plugin-lutaml 0.7.54
 ----
+
+`drift` reports the four standing findings over the fleet or a single chain:
+floorless edges, stale pins (floors that no longer admit the dependency's
+main), prerelease floors (the lint class), and unreleased main.
 
 == Status
 

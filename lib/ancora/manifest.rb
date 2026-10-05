@@ -20,7 +20,8 @@ module Ancora
       @chain = chain
       @state = state
       @attempts = attempts.map do |a|
-        Attempt.new(index: a["index"], pins: a["pins"], created_at: a["created_at"])
+        Attempt.new(index: a["index"], pins: a["pins"],
+                    created_at: a["created_at"])
       end
     end
 
@@ -45,12 +46,13 @@ module Ancora
     def write(path)
       require "fileutils"
       FileUtils.mkdir_p(File.dirname(path))
-      File.write(path, JSON.pretty_generate(
+      json = JSON.pretty_generate(
         chain: @chain, state: @state,
         attempts: @attempts.map do |a|
           { index: a.index, pins: a.pins, created_at: a.created_at }
         end
-      ) + "\n")
+      )
+      File.write(path, "#{json}\n")
     end
   end
 end

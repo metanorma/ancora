@@ -11,7 +11,8 @@ RSpec.describe Ancora::Planner do
                        "deps" => [{ "name" => "xmi", "constraints" => ["~> 0.7"] }] },
       "lutaml/xmi" => { "name" => "xmi", "main_version" => "0.7.6",
                         "deps" => [{ "name" => "lutaml-model", "constraints" => [] }] },
-      "lutaml/lutaml-model" => { "name" => "lutaml-model", "main_version" => "0.8.88", "deps" => [] },
+      "lutaml/lutaml-model" => { "name" => "lutaml-model",
+                                 "main_version" => "0.8.88", "deps" => [] },
       "metanorma/metanorma-plugin-lutaml" => {
         "name" => "metanorma-plugin-lutaml", "main_version" => "0.7.54",
         "deps" => [{ "name" => "ea", "constraints" => [">= 0.6.41"] }]
@@ -23,15 +24,18 @@ RSpec.describe Ancora::Planner do
       "metanorma/metanorma-cli" => {
         "name" => "metanorma-cli", "main_version" => "1.17.0",
         "deps" => [{ "name" => "metanorma-standoc", "constraints" => ["~> 3.5.0"] }]
-      }
+      },
     }
   end
 
   let(:delta) do
     {
-      "lutaml/ea" => { "gem" => "ea", "main_version" => "0.6.42", "released" => "0.6.41", "ahead_by" => 2 },
-      "lutaml/xmi" => { "gem" => "xmi", "main_version" => "0.7.6", "released" => "0.7.6", "ahead_by" => 0 },
-      "metanorma/metanorma-standoc" => { "gem" => "metanorma-standoc", "released" => "3.5.0", "ahead_by" => 65 }
+      "lutaml/ea" => { "gem" => "ea", "main_version" => "0.6.42",
+                       "released" => "0.6.41", "ahead_by" => 2 },
+      "lutaml/xmi" => { "gem" => "xmi", "main_version" => "0.7.6",
+                        "released" => "0.7.6", "ahead_by" => 0 },
+      "metanorma/metanorma-standoc" => { "gem" => "metanorma-standoc",
+                                         "released" => "3.5.0", "ahead_by" => 65 },
     }
   end
 
