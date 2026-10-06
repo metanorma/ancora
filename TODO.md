@@ -119,17 +119,15 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
       engine + their chain.yml (renamed from `release` 2026-10-06: role-named per
       industry survey — kubernetes/release, golang/release, nodejs/release-tools,
       flutter/infra — and to avoid colliding with the existing metanorma-release gem)
-- [x] Candidate mirroring / promote-gate externals (ENGINE SIDE): `ancora externals`
-      checks every floor pointing outside a chain's inventory (including gems without
-      collector nodes) against the rubygems oracle — satisfied by a FINAL vs awaiting
-      release (nothing promotes against another chain's prerelease), and exits 1 while
-      any need awaits (gate semantics, wired into run-action's promote step).
-      `ancora pin --externals` emits the COMPLETE lock: inventory pins + external
-      chains pinned at satisfying finals, awaiting needs as blocking markers.
-      Live 2026-10-06: 57 satisfied, 5 awaiting (pubid/relaton prerelease coupling +
-      the metanorma-cli→metanorma-nist ~> 2.7.0 floor); 74-gem complete lock, exit 1.
-      Runtime-side mirroring (pin the external chain's latest GREEN candidate in
-      candidate-gates) still to wire.
+- [x] Candidate mirroring / promote-gate externals (ENGINE SIDE): the MACHINE owns
+      the promote-gate — gating_step Holds a green wave while any external floor
+      lacks a satisfying final (`ancora externals` reports the same findings and
+      exits 1 for scripting; `ancora pin --externals` emits the COMPLETE lock:
+      inventory pins + external chains at finals, awaiting needs as blockers).
+      Live 2026-10-06: a green+approved metanorma wave Holds on the 5 awaiting
+      floors (pubid/relaton coupling + metanorma-cli→metanorma-nist ~> 2.7.0);
+      74-gem complete lock. Runtime-side mirroring (pin the external chain's
+      latest GREEN candidate in candidate-gates) still to wire.
 - [ ] Release-request handshake: when metanorma needs an unreleased external API
       (the ea 0.6.41 case), file a release request on the external chain repo and
       gate on its rubygems oracle

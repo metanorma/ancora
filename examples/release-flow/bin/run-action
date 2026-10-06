@@ -20,11 +20,8 @@ dispatch_wave)
   done
   ;;
 promote_wave)
-  # the promote-gate: nothing promotes against another chain's
-  # prerelease - `ancora externals` exits 1 while any floor outside
-  # the inventory has no satisfying final
-  ancora externals --chain chain.yml \
-    --network data/network.json --delta data/delta.json
+  # externals are the engine's call: the machine Holds a green wave on
+  # awaiting-release externals and only then emits promote_wave
   items=$(jq -c '.items[]' "$action_json")
   for item in $items; do
     repo=$(jq -r '.repo' <<<"$item")

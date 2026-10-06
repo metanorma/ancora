@@ -37,8 +37,8 @@ workflows/drift-radar.yml     scheduled drift report + data refresh
 
 | `dispatch_wave` | for each item: `gh workflow run rubygems-release.yml -R <repo> --field next_version=<version>`
 | `gate` | run the gate recipe (lock, suites, canary) then record green/red on the manifest
-| `promote_wave` | externals check first (exits 1 while any external floor lacks a satisfying final), then dispatch finals per item, same idempotent mechanism
-| `hold` | awaiting promote approval — notify, stop
+| `promote_wave` | dispatch finals per item, same idempotent mechanism (the machine only emits this after the approval and externals holds clear)
+| `hold` | the machine held the wave (promote approval, or externals awaiting release) — notify, stop
 | `halt` | attempts exhausted — notify humans with the manifest history
 | `done` | wave complete — stop the schedule
 |===

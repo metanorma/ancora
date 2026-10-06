@@ -73,6 +73,7 @@ module Ancora
     def gating_step(manifest)
       if (green = manifest.promoted_from)
         return hold_for_approval(green) if approval_required?(manifest)
+        return hold_for_externals if external_blockers.any?
 
         manifest.start_promotion(green)
         return promote_wave(manifest, 0)
@@ -92,6 +93,19 @@ module Ancora
     def hold_for_approval(attempt)
       Hold.new(reason: "attempt #{attempt.index} is green; awaiting promote " \
                        "approval (ancora approve --manifest ...)")
+    end
+
+    # the promote-gate: nothing promotes against another chain's
+    # prerelease - promotion waits for external finals
+    def external_blockers
+      Externals.new(@graph, chain: @chain, oracle: @oracle).check
+        .select { |f| f.status == :awaiting_release }
+    end
+
+    def hold_for_externals
+      list = external_blockers
+        .map { |f| "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')})" }
+      Hold.new(reason: "externals awaiting release: #{list.join('; ')}")
     end
 
     def promoted_step(manifest)

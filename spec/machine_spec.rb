@@ -41,6 +41,16 @@ RSpec.describe Ancora::Machine do
     @published ||= Hash.new { |h, k| h[k] = [] }
   end
 
+  # externals of the fixture's metanorma chain, all satisfied by finals;
+  # declared last so the newest stubs shadow everything else
+  def stub_externals_satisfied
+    stub_all_versions
+    stub_versions("glossarist", ["2.14.1"])
+    stub_versions("relaton-cli", ["3.0.0"])
+    stub_versions("ea", ["0.6.41"])
+    stub_versions("sts", ["0.5.7"])
+  end
+
   it "opens the first attempt with oracle-numbered candidates and dispatches wave 1" do
     stub_all_versions
     action = machine.step(manifest, targets)
@@ -161,6 +171,7 @@ RSpec.describe Ancora::Machine do
     machine.step(manifest)
     machine.step(manifest)
     manifest.record_gate!("green")
+    stub_externals_satisfied
 
     action = machine.step(manifest)
     expect(action).to be_a(described_class::PromoteWave)
@@ -179,6 +190,7 @@ RSpec.describe Ancora::Machine do
     machine.step(manifest)
     machine.step(manifest)
     manifest.record_gate!("green")
+    stub_externals_satisfied
     action = machine.step(manifest)
     expect(action).to be_a(described_class::PromoteWave)
     expect(action.index).to eq 0
@@ -200,6 +212,7 @@ RSpec.describe Ancora::Machine do
     machine.step(manifest)
     machine.step(manifest)
     manifest.record_gate!("green")
+    stub_externals_satisfied
     machine.step(manifest) # promote wave 1 finals
     machine.step(manifest) # wave 1 finals visible, advance to wave 2
 
@@ -231,9 +244,33 @@ RSpec.describe Ancora::Machine do
     expect(manifest.state).to eq "gating"
 
     manifest.approve!
+    stub_externals_satisfied
     action = step.call
     expect(action).to be_a(described_class::PromoteWave)
     expect(manifest.state).to eq "promoted"
+  end
+
+  it "holds a green wave on awaiting-release externals" do
+    stub_all_versions
+    machine.step(manifest, targets)
+    publish("metanorma-document", ["0.5.2.pre.alpha.1"])
+    publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+    machine.step(manifest)
+    machine.step(manifest)
+    manifest.record_gate!("green")
+    manifest.approve!
+    # every external final satisfies except relaton-cli (prerelease only)
+    stub_externals_satisfied
+    stub_versions("relaton-cli", %w[3.0.0.pre.alpha.4 1.19.2])
+
+    action = machine.step(manifest)
+    expect(action).to be_a(described_class::Hold)
+    expect(action.reason).to include("relaton-cli")
+    expect(manifest.state).to eq "gating"
+
+    # the external chain lands its finals: promotion proceeds
+    stub_externals_satisfied
+    expect(machine.step(manifest)).to be_a(described_class::PromoteWave)
   end
 
   it "runs the glossarist single-gem chain through its whole lifecycle" do
