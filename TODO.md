@@ -122,10 +122,14 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 - [x] Candidate mirroring / promote-gate externals (ENGINE SIDE): `ancora externals`
       checks every floor pointing outside a chain's inventory (including gems without
       collector nodes) against the rubygems oracle — satisfied by a FINAL vs awaiting
-      release (nothing promotes against another chain's prerelease). Live 2026-10-06:
-      57 satisfied, 5 awaiting (pubid/relaton prerelease coupling + the
-      metanorma-cli→metanorma-nist ~> 2.7.0 floor). Runtime-side mirroring (pin the
-      external chain's latest GREEN candidate in gate locks) still to wire.
+      release (nothing promotes against another chain's prerelease), and exits 1 while
+      any need awaits (gate semantics, wired into run-action's promote step).
+      `ancora pin --externals` emits the COMPLETE lock: inventory pins + external
+      chains pinned at satisfying finals, awaiting needs as blocking markers.
+      Live 2026-10-06: 57 satisfied, 5 awaiting (pubid/relaton prerelease coupling +
+      the metanorma-cli→metanorma-nist ~> 2.7.0 floor); 74-gem complete lock, exit 1.
+      Runtime-side mirroring (pin the external chain's latest GREEN candidate in
+      candidate-gates) still to wire.
 - [ ] Release-request handshake: when metanorma needs an unreleased external API
       (the ea 0.6.41 case), file a release request on the external chain repo and
       gate on its rubygems oracle

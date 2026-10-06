@@ -61,15 +61,26 @@ module Ancora
     end
 
     def pin
-      options = { delta: nil }
+      options = { delta: nil, seeds: [], chain: nil, externals: nil }
       parse_graph_options(options)
 
       chain = load_chain(options)
       return 1 unless chain
 
       graph = Graph.load(options.fetch(:network), options[:delta])
-      puts GateLock.new(chain, graph).gemfile
+      findings = options[:externals] ? external_findings(chain, graph) : []
+      lock = GateLock.new(chain, graph, externals: findings)
+      puts lock.gemfile
+      unless lock.awaiting.empty?
+        lock.awaiting.each { |f| warn "gate lock blocked: #{f.from} -> #{f.gem}" }
+        return 1
+      end
       0
+    end
+
+    def external_findings(chain, graph)
+      Externals.new(graph, chain: chain,
+                           oracle: Oracle::Rubygems.new).check
     end
 
     def drift
@@ -120,7 +131,7 @@ module Ancora
         "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')}): " \
           "latest final #{f.latest_final || 'none'}"
       end
-      0
+      satisfied.size == findings.size ? 0 : 1
     end
 
     def section(items, title)
@@ -272,6 +283,7 @@ module Ancora
         o.on("--chain PATH") { |v| options[:chain] = v }
         o.on("--manifest PATH") { |v| options[:manifest] = v }
         o.on("--format F") { |v| options[:format] = v }
+        o.on("--externals") { |v| options[:externals] = v }
       end.parse!(@argv)
     end
 

@@ -130,6 +130,43 @@ RSpec.describe Ancora::CLI do
     expect(code).to eq 0
   end
 
+  it "blocks the complete gate lock on awaiting-release externals" do
+    Dir.mktmpdir do |dir|
+      network, delta, chain = write_data(dir)
+      # relaton-cli satisfies only by prerelease; the rest have finals
+      stub_versions("glossarist", %w[2.14.1 2.13.0])
+      stub_versions("ea", ["0.6.41"])
+      stub_versions("sts", ["0.5.7"])
+      stub_versions("relaton-cli", %w[3.0.0.pre.alpha.4 1.19.2])
+      code = nil
+      expect do
+        code = described_class.run(
+          ["pin", "--chain", chain, "--network", network, "--delta", delta,
+           "--externals"],
+        )
+      end.to output(/# external chains - finals.*gem "ea", "0\.6\.41"/m).to_stdout
+      expect(code).to eq 1
+    end
+  end
+
+  it "externals exits 1 while a chain cannot promote (gate semantics)" do
+    Dir.mktmpdir do |dir|
+      network, delta, chain = write_data(dir)
+      stub_versions("glossarist", %w[2.14.1 2.13.0])
+      stub_versions("ea", ["0.6.41"])
+      stub_versions("sts", ["0.5.7"])
+      stub_versions("relaton-cli", %w[3.0.0.pre.alpha.4 1.19.2])
+      code = nil
+      expect do
+        code = described_class.run(
+          ["externals", "--chain", chain, "--network", network, "--delta",
+           delta],
+        )
+      end.to output(/awaiting release.*\(1\).*relaton-cli/m).to_stdout
+      expect(code).to eq 1
+    end
+  end
+
   it "prints usage and exits 1 for an unknown command" do
     code = nil
     expect { code = described_class.run(["bogus"]) }
