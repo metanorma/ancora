@@ -164,6 +164,13 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 ## House rules (absolute)
 
+- **HOLD (2026-10-06): NO metanorma-* gem releases yet** — the owner has stopped all
+  metanorma-* releases until further notice. Do NOT dispatch release workflows, do NOT
+  bump/promote waves to finals, do NOT tag. Chains advance via git-main pins only
+  (branch: main in consuming Gemfiles); prerelease waves may still be BUILT and gated,
+  but every promote step stays Held. Non-metanorma externals (relaton/lutaml/pubid)
+  are other owners' releases — pin what they already published, never release for them.
+
 - Never push tags, never commit/push/merge to main; PRs rebase-merge; stage by
   explicit path (never `git add -A`); no AI-attribution trailers; no filing outside
   metanorma/lutaml/relaton/pubid/ribose orgs; ask before destructive actions.
