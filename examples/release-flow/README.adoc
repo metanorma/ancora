@@ -36,7 +36,7 @@ workflows/drift-radar.yml     scheduled drift report + data refresh
 | action | runtime does
 
 | `dispatch_wave` | for each item: `gh workflow run rubygems-release.yml -R <repo> --field next_version=<version>`
-| `gate` | run the gate recipe (lock, suites, canary) then record green/red on the manifest
+| `gate` | the payload carries `corpora` (the configured `mn-samples-*` runs gating this attempt, `{repo, ref, documents, budget, gems}`): generate the GateLock, run suites + each corpus + canary, record green/red
 | `promote_wave` | dispatch finals per item, same idempotent mechanism (the machine only emits this after the approval and externals holds clear)
 | `hold` | the machine held the wave (promote approval, or externals awaiting release) — notify, stop
 | `halt` | attempts exhausted — notify humans with the manifest history

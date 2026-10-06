@@ -10,7 +10,8 @@ module Ancora
   # composes them with the attempt's pins.
   class GateRecipe
     Suite = Struct.new(:gem, :repo, :commands, keyword_init: true)
-    Recipe = Struct.new(:lockfile, :suites, :canary, keyword_init: true)
+    Recipe = Struct.new(:lockfile, :suites, :canary, :corpora,
+                        keyword_init: true)
 
     def initialize(chain, graph)
       @chain = chain
@@ -25,6 +26,7 @@ module Ancora
                     commands: @chain.gate_commands)
         end,
         canary: @chain.canary_commands,
+        corpora: @chain.corpora_for(pins.keys),
       )
     end
   end

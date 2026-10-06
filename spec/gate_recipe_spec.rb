@@ -20,5 +20,22 @@ RSpec.describe Ancora::GateRecipe do
     expect(recipe.suites.first.repo).to eq "metanorma/metanorma-document"
     expect(recipe.suites.first.commands).to eq(["bundle exec rspec"])
     expect(recipe.canary).to eq(["bundle exec rake site"])
+    expect(recipe.corpora).to be_empty
+  end
+
+  it "includes the corpora gating the attempt's gems" do
+    chain = FleetFixture.load_chain(FleetFixture::METANORMA_CHAIN)
+    pins = {
+      "metanorma-iso" => "3.5.1.pre.alpha.1",
+      "metanorma-cli" => "1.18.0.pre.alpha.1",
+    }
+    recipe = described_class.new(chain, graph).build(pins)
+    expect(recipe.corpora.map(&:repo)).to eq(
+      ["metanorma/mn-samples-iso", "metanorma/mn-samples-iso-private",
+       "metanorma/mn-samples-jis"],
+    )
+    jis = recipe.corpora.find { |e| e.repo == "metanorma/mn-samples-jis" }
+    expect(jis.gems).to eq(["metanorma-cli"])
+    expect(jis.budget).to eq 240
   end
 end

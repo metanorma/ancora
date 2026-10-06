@@ -22,7 +22,11 @@ planned -> candidate -> gating -> promoted -> done
   nothing publicly.
 * *gating*: the integration harness generates a lock pinning the ENTIRE candidate set
   and runs each next-wave gem's suite plus a canary corpus (a real document compiled
-  end-to-end through presentation/site rendering) against it.
+  end-to-end through presentation/site rendering) against it. The `canary.corpora:`
+  map in chain.yml names which `mn-samples-*` corpus runs gate which gem's waves
+  (`{repo, ref, documents, budget}`); a wave is not green on gem suites alone — the
+  engine enforces that every CONFIGURED corpus compiled green against the lock, and
+  never infers coverage.
 * *attempts*: a failed gate spawns candidate attempt K+1 — only for gems whose main
   changed; counters are per (gem, semver target); bounded by `max_attempts`.
 * *promoted*: the first fully-green attempt migrates to finals in wave order; floors

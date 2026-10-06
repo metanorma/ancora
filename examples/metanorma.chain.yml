@@ -14,12 +14,34 @@ terminus: [metanorma-cli]
 # the integration gate: every wave gem's suite runs against a lock
 # pinning the ENTIRE candidate set, then the canary compiles a real
 # corpus document end-to-end including site rendering (the cg3 lesson:
-# unit-green does not mean works)
+# unit-green does not mean works). corpora names which mn-samples-*
+# runs gate which gem's waves - a wave is not green on gem suites
+# alone; the engine enforces only the CONFIGURED corpora (it never
+# infers coverage - curating this map is the chain owner's job)
 gate:
   commands: [bundle exec rspec]
 canary:
   commands:
     - bin/compile-plateau-doc.sh   # small real corpus doc -> presentation + site-gen
+  corpora:
+    metanorma-iso:
+      - repo: metanorma/mn-samples-iso
+        ref: main
+        documents: [ISO 10303-2]
+        budget: 300
+      - repo: metanorma/mn-samples-iso-private   # token'd checkout at runtime
+        budget: 600
+    metanorma-jis:
+      - repo: metanorma/mn-samples-jis
+        budget: 240
+    metanorma-cli:                               # the terminus gates the union
+      - repo: metanorma/mn-samples-iso
+        ref: main
+        budget: 300
+      - repo: metanorma/mn-samples-iso-private
+        budget: 600
+      - repo: metanorma/mn-samples-jis
+        budget: 240
 # no finals without explicit approval (ancora approve) - the guardrail
 # until two supervised waves complete clean
 promote_approval: manual

@@ -75,6 +75,55 @@ RSpec.describe Ancora::Chain do
     end
   end
 
+  it "merges corpora across gated gems, keeping per-repo gems" do
+    chain(FleetFixture::METANORMA_CHAIN) do |c|
+      corpora = c.corpora_for(%w[metanorma-iso metanorma-cli])
+      expect(corpora.map(&:repo)).to eq(
+        ["metanorma/mn-samples-iso", "metanorma/mn-samples-iso-private",
+         "metanorma/mn-samples-jis"],
+      )
+      iso_private = corpora.find do |e|
+        e.repo == "metanorma/mn-samples-iso-private"
+      end
+      expect(iso_private.gems).to eq(%w[metanorma-cli metanorma-iso])
+      expect(iso_private.budget).to eq 600
+      expect(corpora.find { |e| e.repo == "metanorma/mn-samples-iso" }.documents)
+        .to eq(["ISO 10303-2"])
+    end
+  end
+
+  it "defaults corpus ref and applies only to requested gems" do
+    chain(FleetFixture::METANORMA_CHAIN) do |c|
+      iso = c.corpora_for(["metanorma-iso"]).find do |e|
+        e.repo == "metanorma/mn-samples-iso-private"
+      end
+      expect(iso.ref).to eq "main"
+      expect(iso.gems).to eq(["metanorma-iso"])
+      expect(c.corpora_for(["metanorma-document"])).to be_empty
+    end
+  end
+
+  it "rejects malformed corpus entries" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "chain.yml")
+      File.write(path, "name: x\ncanary:\n  corpora:\n    gem-a:\n      ref: main\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, /list of entries/)
+
+      File.write(path, "name: x\ncanary:\n  corpora:\n    gem-a:\n      - ref: main\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, %r{requires repo:})
+
+      File.write(path, "name: x\ncanary:\n  corpora:\n    gem-a:\n      - repo: r/c\n        budget: lots\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, /budget/)
+
+      File.write(path, "name: x\ncanary:\n  corpora:\n    gem-a:\n      - repo: r/c\n        flavor: x\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, /unknown key/)
+    end
+  end
+
   it "defaults promote approval to manual (the guardrail)" do
     chain(FleetFixture::LUTAML_CHAIN) do |c|
       expect(c.promote_approval).to eq "manual"

@@ -17,11 +17,17 @@ module Ancora
     class ConfigError < StandardError; end
 
     Unit = Struct.new(:repo, :gems, keyword_init: true)
+    # one corpus run gating a set of gems; the engine only enforces the
+    # CONFIGURED corpora - it never infers coverage
+    CorpusEntry = Struct.new(:repo, :ref, :documents, :budget, :gems,
+                             keyword_init: true)
 
     TOP_LEVEL_KEYS = %w[name inventory monorepos terminus max_attempts gate canary
                         promote_approval].freeze
     INVENTORY_KEYS = %w[orgs roots gems exclude].freeze
     APPROVAL_MODES = %w[manual none].freeze
+    CORPUS_ENTRY_KEYS = %w[repo ref documents budget].freeze
+    DEFAULT_CORPUS_BUDGET = 600
 
     def self.load(path)
       data = YAML.safe_load_file(path, permitted_classes: [],
@@ -49,7 +55,8 @@ module Ancora
         terminus: string_array("#{path}: terminus", data["terminus"]),
         max_attempts: max_attempts(path, data["max_attempts"]),
         gate_commands: commands(path, "gate", data["gate"]),
-        canary_commands: commands(path, "canary", data["canary"]),
+        canary_commands: canary_commands(path, data["canary"]),
+        corpora: corpora(path, data.dig("canary", "corpora")),
         promote_approval: promote_approval(path, data["promote_approval"]),
       )
     end
@@ -71,6 +78,49 @@ module Ancora
 
       reject_unknown_keys("#{path}: #{section}:", value.keys, ["commands"])
       string_array("#{path}: #{section}: commands", value["commands"])
+    end
+
+    def self.canary_commands(path, value)
+      return [] if value.nil?
+      unless value.is_a?(Hash)
+        raise ConfigError, "#{path}: canary must be a mapping"
+      end
+
+      reject_unknown_keys("#{path}: canary:", value.keys, %w[commands corpora])
+      string_array("#{path}: canary: commands", value["commands"])
+    end
+
+    # the corpora gate: gem -> corpus runs that gate that gem's waves
+    def self.corpora(path, value)
+      return {} if value.nil?
+      unless value.is_a?(Hash) && value.values.all?(Array)
+        raise ConfigError, "#{path}: canary corpora must map gem -> list of entries"
+      end
+
+      value.to_h do |gem, entries|
+        [gem.to_s, entries.map { |e| corpus_entry(path, gem.to_s, e) }]
+      end
+    end
+
+    def self.corpus_entry(path, gem, value)
+      where = "#{path}: canary: corpora: #{gem}:"
+      unless value.is_a?(Hash)
+        raise ConfigError, "#{where} must be a mapping"
+      end
+
+      reject_unknown_keys(where, value.keys, CORPUS_ENTRY_KEYS)
+      repo = value["repo"]
+      raise ConfigError, "#{where} requires repo:" unless repo.is_a?(String)
+
+      budget = value.fetch("budget", DEFAULT_CORPUS_BUDGET)
+      unless budget.is_a?(Integer) && budget.positive?
+        raise ConfigError, "#{where} budget must be a positive integer"
+      end
+
+      CorpusEntry.new(repo: repo, ref: value.fetch("ref", "main"),
+                      documents: string_array("#{where} documents",
+                                              value["documents"]),
+                      budget: budget, gems: [gem])
     end
 
     def self.promote_approval(path, value)
@@ -108,12 +158,13 @@ module Ancora
       end
     end
     private_class_method :reject_unknown_keys, :string_array, :monorepos,
-                         :max_attempts, :commands, :promote_approval
+                         :max_attempts, :commands, :canary_commands, :corpora,
+                         :corpus_entry, :promote_approval
 
     # how many gate attempts a wave gets before the machine halts for
     # humans; nil falls back to the machine default
     attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos,
-                :max_attempts, :gate_commands, :canary_commands
+                :max_attempts, :gate_commands, :canary_commands, :corpora
 
     def promote_approval
       @promote_approval
@@ -121,7 +172,7 @@ module Ancora
 
     def initialize(name:, orgs: [], roots: [], gems: [], exclude: [], monorepos: {},
                    terminus: [], max_attempts: nil, gate_commands: [],
-                   canary_commands: [], promote_approval: "manual")
+                   canary_commands: [], corpora: {}, promote_approval: "manual")
       @name = name
       @orgs = orgs.freeze
       @roots = roots.freeze
@@ -132,7 +183,25 @@ module Ancora
       @max_attempts = max_attempts
       @gate_commands = gate_commands.freeze
       @canary_commands = canary_commands.freeze
+      @corpora = corpora.freeze
       @promote_approval = promote_approval
+    end
+
+    # The corpus runs gating the given gems, merged per repo: gems that
+    # share a corpus are unioned into one entry. The terminus union is
+    # whatever the config lists for the terminus gem - the engine never
+    # infers coverage.
+    def corpora_for(gems)
+      grouped = Hash.new { |h, k| h[k] = [] }
+      gems.each do |gem|
+        (@corpora[gem] || []).each { |entry| grouped[entry.repo] << [entry, gem] }
+      end
+      grouped.map do |repo, pairs|
+        first = pairs.first.first
+        CorpusEntry.new(repo: repo, ref: first.ref, documents: first.documents,
+                        budget: first.budget,
+                        gems: pairs.map(&:last).uniq.sort)
+      end.sort_by(&:repo)
     end
 
     # The gems this chain manages and pins as a whole, resolved against

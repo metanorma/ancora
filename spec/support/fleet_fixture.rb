@@ -130,6 +130,19 @@ module FleetFixture
       commands: [bundle exec rspec]
     canary:
       commands: [bundle exec rake site]
+      corpora:
+        metanorma-iso:
+          - repo: metanorma/mn-samples-iso
+            ref: main
+            documents: [ISO 10303-2]
+            budget: 300
+          - repo: metanorma/mn-samples-iso-private
+            budget: 600
+        metanorma-cli:
+          - repo: metanorma/mn-samples-iso-private
+            budget: 600
+          - repo: metanorma/mn-samples-jis
+            budget: 240
     promote_approval: none
   YAML
 

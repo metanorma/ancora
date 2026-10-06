@@ -173,7 +173,13 @@ module Ancora
 
     def emit(action, manifest, chain, graph, format)
       if format == "json"
-        puts JSON.generate(action_payload(action).merge(state: manifest.state))
+        payload = action_payload(action)
+        if action.is_a?(Machine::Gate)
+          payload[:corpora] = corpora_payload(chain.corpora_for(
+                                                manifest.current_attempt.pins.keys,
+                                              ))
+        end
+        puts JSON.generate(payload.merge(state: manifest.state))
         return
       end
 
@@ -208,6 +214,13 @@ module Ancora
       items.map { |i| { gem: i.gem, repo: i.repo, version: i.version } }
     end
 
+    def corpora_payload(entries)
+      entries.map do |e|
+        { repo: e.repo, ref: e.ref, documents: e.documents, budget: e.budget,
+          gems: e.gems }
+      end
+    end
+
     def render_gate(action, chain, graph, pins)
       recipe = GateRecipe.new(chain, graph).build(pins)
       pin_count = recipe.lockfile.lines.count { |l| l.start_with?('gem "') }
@@ -217,6 +230,11 @@ module Ancora
         puts "  suite #{s.gem} (#{s.repo}): #{cmds}"
       end
       recipe.canary.each { |c| puts "  canary: #{c}" }
+      recipe.corpora.each do |c|
+        docs = c.documents.empty? ? "all" : c.documents.join(", ")
+        puts "  corpus #{c.repo}@#{c.ref} (gems: #{c.gems.join(', ')}; " \
+             "docs: #{docs}; budget #{c.budget}s)"
+      end
     end
 
     def render_action(action)
