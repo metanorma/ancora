@@ -1,0 +1,25 @@
+# House rubocop config in the cimas shape (metanorma-org fleet standard);
+# cimas sync owns this file once the repo is onboarded.
+inherit_from:
+  - https://raw.githubusercontent.com/riboseinc/oss-guides/main/ci/rubocop.yml
+  # .rubocop_todo.yml MUST be the last entry. inherit_from is last-wins:
+  # if listed before oss-guides, the shared config's stricter Metrics/
+  # (MethodLength, BlockLength, etc.) rules override the todo's per-file
+  # grandfathering, and the todo becomes inert on those cops.
+  - .rubocop_todo.yml
+
+# Rubocop plugins enabled centrally so every metanorma-org gem picks them up
+# on cimas sync. Per ronaldtse feedback on metanorma/ci#332.
+plugins:
+  - rubocop-rspec
+  - rubocop-performance
+  - rubocop-rake
+
+AllCops:
+  # local repo-specific modifications: match this gemspec's declared floor
+  TargetRubyVersion: 3.0
+
+Style/YAMLFileRead:
+  # YAML.safe_load_file is psych 4+ (Ruby 3.1+); this gem declares
+  # Ruby >= 3.0, where only YAML.safe_load exists
+  Enabled: false

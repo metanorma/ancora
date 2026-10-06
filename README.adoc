@@ -22,22 +22,91 @@ planned -> candidate -> gating -> promoted -> done
   nothing publicly.
 * *gating*: the integration harness generates a lock pinning the ENTIRE candidate set
   and runs each next-wave gem's suite plus a canary corpus (a real document compiled
-  end-to-end through presentation/site rendering) against it.
+  end-to-end through presentation/site rendering) against it. The `canary.corpora:`
+  map in chain.yml names which `mn-samples-*` corpus runs gate which gem's waves
+  (`{repo, ref, documents, budget}`); a wave is not green on gem suites alone — the
+  engine enforces that every CONFIGURED corpus compiled green against the lock, and
+  never infers coverage.
 * *attempts*: a failed gate spawns candidate attempt K+1 — only for gems whose main
   changed; counters are per (gem, semver target); bounded by `max_attempts`.
 * *promoted*: the first fully-green attempt migrates to finals in wave order; floors
   are raised to finals, never to prereleases; the terminus releases last with the
   wave manifest in its notes.
 
+== Chains
+
+A chain is configured entirely in a `chain.yml` (per-org release repo;
+examples in `examples/`) — the engine knows nothing org-specific:
+
+----
+name: metanorma
+inventory:
+  orgs: [metanorma]
+  roots: [metanorma-cli]        # restrict to the terminus's closure
+monorepos:
+  relaton/relaton-cli: [relaton, relaton-cli]
+terminus: [metanorma-cli]
+----
+
+* *inventory*: the managed set — org gems (optionally restricted to root
+  closures) plus explicit gems (which need no graph node).
+* *monorepos*: repo -> gem-set release units — waves version the repo, and
+  floors expand to the set (relaton ships `relaton` + `relaton-cli` from one
+  repo; both are pinned together).
+* *terminus*: the gem a wave must culminate in, alone in the final wave —
+  expanded through its monorepo unit. A chain may declare none: the lutaml
+  fleet is a fan whose CLI covers only part of the org, so its waves are
+  antichains with no single culminating release.
+
+The four chains: metanorma (terminus `metanorma-cli`), relaton (terminus
+`relaton-cli`, monorepo unit), glossarist (single-gem library chain, terminus
+is the gem), lutaml (whole-org fan, no terminus).
+
 == Dry run (M1)
 
 ----
 bundle exec exe/ancora plan --network network.json --delta delta.json
 bundle exec exe/ancora plan --network network.json --seeds metanorma-standoc
+bundle exec exe/ancora plan --network network.json --chain examples/metanorma.chain.yml
+bundle exec exe/ancora pin --chain examples/metanorma.chain.yml --network network.json --delta delta.json
+bundle exec exe/ancora drift --network network.json --delta delta.json
 bundle exec exe/ancora check metanorma-plugin-lutaml 0.7.54
+bundle exec exe/ancora tag metanorma/metanorma-cli 1.17.0
+bundle exec exe/ancora ci metanorma/metanorma-cli
+bundle exec exe/ancora externals --chain examples/metanorma.chain.yml --network network.json --delta delta.json
+----
+
+`check`, `tag`, and `ci` query the three read-only oracles the engine trusts:
+the rubygems versions API, git tags, and CI runs. Nothing in ancora writes to
+them; the wave state machine is a cache over them.
+
+`drift` reports the four standing findings over the fleet or a single chain:
+floorless edges, stale pins (floors that no longer admit the dependency's
+main), prerelease floors (the lint class), and unreleased main. `externals`
+checks a chain's floors that point outside its inventory against the rubygems
+oracle: nothing promotes against another chain's prerelease, so a need only a
+prerelease satisfies is the cross-chain release-request case.
+
+== The step-per-run state machine
+
+Waves exceed any single workflow-run time limit, so the runtime performs ONE
+transition per run: `ancora step` loads the manifest, queries the oracles,
+returns the one action a runtime run would execute (dispatch a wave's
+candidates, gate the pinned set, promote a wave's finals, halt), and commits
+the manifest back. A crash at any point resumes by re-querying the oracles;
+duplicate dispatches are no-ops by the release workflows' push guards. The
+machine never invents versions: candidate targets come from the owner's data
+(the gemspec on main, or an approved advisory), and the engine only numbers
+candidates against the rubygems oracle.
+
+----
+bundle exec exe/ancora step --chain examples/metanorma.chain.yml \
+  --network network.json --delta delta.json --manifest state/waves.json
 ----
 
 == Status
 
-M1 skeleton. See TODO.md for the roadmap (M1–M5) and the design of record in
+M1 complete; M2 engine core (state machine + manifest commit-back) done. The
+per-org release repos (metanorma/release et al) wire the same engine into GHA.
+See TODO.md for the roadmap (M2–M5) and the design of record in
 ORCHESTRATOR-PLAN.md at the fleet-audit workspace.

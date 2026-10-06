@@ -8,9 +8,9 @@ Gem::Specification.new do |spec|
 
   spec.summary = "Dependency-ordered release wave orchestrator for gem fleets"
   spec.description = "Ancora (Latin: anchor) plans, gates, and releases gem " \
-    "fleets in dependency order: candidate prereleases per wave, integration " \
-    "gates over pinned sets, canary corpora, and promotion to finals - with " \
-    "rubygems, CI runs, and git tags as the only source of truth."
+                     "fleets in dependency order: candidate prereleases per wave, integration " \
+                     "gates over pinned sets, canary corpora, and promotion to finals - with " \
+                     "rubygems, CI runs, and git tags as the only source of truth."
   spec.homepage = "https://github.com/metanorma/ancora"
   spec.license = "MIT"
 
@@ -20,5 +20,12 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
   spec.required_ruby_version = ">= 3.0"
 
+  spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.13"
+  spec.add_development_dependency "rubocop", "~> 1"
+  spec.add_development_dependency "rubocop-performance"
+  spec.add_development_dependency "rubocop-rake"
+  spec.add_development_dependency "rubocop-rspec"
+  spec.add_development_dependency "webmock"
+  spec.metadata["rubygems_mfa_required"] = "true"
 end

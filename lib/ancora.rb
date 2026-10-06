@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
+require "cgi"
+require "fileutils"
 require "json"
 require "net/http"
+require "rubygems"
 require "uri"
+require "yaml"
 
 # Ancora (Latin: anchor) orchestrates dependency-ordered release waves for
 # gem fleets. One invariant governs everything: rubygems, CI runs, and git
@@ -11,9 +15,15 @@ require "uri"
 module Ancora
   autoload :Version, "ancora/version"
   autoload :Graph, "ancora/graph"
+  autoload :Chain, "ancora/chain"
   autoload :Planner, "ancora/planner"
   autoload :Oracle, "ancora/oracle"
   autoload :Candidate, "ancora/candidate"
+  autoload :Drift, "ancora/drift"
+  autoload :Externals, "ancora/externals"
+  autoload :GateLock, "ancora/gate_lock"
+  autoload :GateRecipe, "ancora/gate_recipe"
+  autoload :Machine, "ancora/machine"
   autoload :Manifest, "ancora/manifest"
   autoload :CLI, "ancora/cli"
 end

@@ -1,0 +1,9 @@
+# The lutaml chain: the whole lutaml org, as one fleet. This fleet is
+# a fan - the lutaml gem (its CLI) covers only part of it; the rest
+# (ea, xmi, oscal, ...) is consumed by the metanorma chain instead. No
+# single terminus exists, so none is declared: waves are antichains of
+# the org graph and may end in any terminal set; the wave manifest
+# goes into the notes of the final wave's releases.
+name: lutaml
+inventory:
+  orgs: [lutaml]

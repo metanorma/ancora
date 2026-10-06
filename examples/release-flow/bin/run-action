@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# DRAFT: executes one ancora action (action.json from `ancora step
+# --format json`). Idempotent by construction: duplicate dispatches are
+# no-ops (the gem release workflows' push guards), and promotion
+# re-dispatch completes partial pushes.
+set -euo pipefail
+
+action_json=${1:?usage: run-action action.json}
+kind=$(jq -r '.action' "$action_json")
+
+case "$kind" in
+dispatch_wave)
+  items=$(jq -c '.items[]' "$action_json")
+  for item in $items; do
+    repo=$(jq -r '.repo' <<<"$item")
+    version=$(jq -r '.version' <<<"$item")
+    echo "dispatching $repo $version"
+    gh workflow run rubygems-release.yml -R "$repo" --ref main \
+      --field next_version="$version"
+  done
+  ;;
+promote_wave)
+  # externals are the engine's call: the machine Holds a green wave on
+  # awaiting-release externals and only then emits promote_wave
+  items=$(jq -c '.items[]' "$action_json")
+  for item in $items; do
+    repo=$(jq -r '.repo' <<<"$item")
+    version=$(jq -r '.version' <<<"$item")
+    echo "promoting $repo $version"
+    gh workflow run rubygems-release.yml -R "$repo" --ref main \
+      --field next_version="$version"
+  done
+  ;;
+gate)
+  # The gate action carries the corpora dispatch list: one workflow run
+  # per configured corpus (mn-samples-*; -private variants need the
+  # token'd checkout), polled green via the CI oracle like a gem suite.
+  jq -r '.corpora[]? | "\(.repo)@\(.ref) docs=\(.documents | join(",")) budget=\(.budget)"' \
+    "$action_json" | while IFS= read -r corpus; do
+      echo "corpus run: $corpus"
+    done
+  # TODO(gate runner, M3): generate the lock (ancora pin --chain
+  # chain.yml --externals with the attempt's candidates), bundle lock,
+  # run each gated gem's suite in a disposable container, dispatch one
+  # workflow per corpus above and poll each to green, run the canary
+  # commands end-to-end including presentation/site rendering, then
+  # record the verdict on the manifest (green/red + changed gems: a red
+  # corpus maps back to its gated gems via chain.yml corpora) and commit.
+  echo "gate runner not fully wired yet; see ancora GateRecipe" >&2
+  exit 2
+  ;;
+hold)
+  echo "HOLD: $(jq -r '.reason' "$action_json")" >&2
+  # TODO(notify): post to the team channel; the schedule keeps polling
+  exit 3
+  ;;
+halt)
+  echo "HALT: $(jq -r '.reason' "$action_json")" >&2
+  # TODO(notify): open an issue with the attempt history
+  exit 4
+  ;;
+done)
+  echo "wave complete; disable the release-wave schedule"
+  ;;
+*)
+  echo "unknown action: $kind" >&2
+  exit 1
+  ;;
+esac

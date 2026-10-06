@@ -1,0 +1,11 @@
+# The relaton chain: relaton and relaton-cli ship from ONE repo
+# (relaton/relaton-cli, root gemspec naming only relaton-cli), so they
+# are a monorepo unit - one version, one release, always pinned
+# together, and declaring relaton-cli as terminus expands to the pair.
+# The pubid org rides this chain until it warrants its own.
+name: relaton
+inventory:
+  orgs: [relaton, pubid]
+monorepos:
+  relaton/relaton-cli: [relaton, relaton-cli]
+terminus: [relaton-cli]

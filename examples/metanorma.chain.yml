@@ -1,0 +1,48 @@
+# The metanorma chain: everything in the metanorma org that the
+# terminus (metanorma-cli) transitively needs. lutaml, relaton, pubid,
+# and glossarist gems inside that closure are external chains - they
+# are gated by mirroring (M5), never re-released here.
+name: metanorma
+inventory:
+  orgs: [metanorma]
+  # restrict to the cli's dependency closure, so org tooling that the
+  # cli never sees (cimas, xseed, ...) stays out of the waves
+  roots: [metanorma-cli]
+# the terminus must be alone in the final wave of any plan that
+# reaches it; promotion embeds the wave manifest in its release notes
+terminus: [metanorma-cli]
+# the integration gate: every wave gem's suite runs against a lock
+# pinning the ENTIRE candidate set, then the canary compiles a real
+# corpus document end-to-end including site rendering (the cg3 lesson:
+# unit-green does not mean works). corpora names which mn-samples-*
+# runs gate which gem's waves - a wave is not green on gem suites
+# alone; the engine enforces only the CONFIGURED corpora (it never
+# infers coverage - curating this map is the chain owner's job)
+gate:
+  commands: [bundle exec rspec]
+canary:
+  commands:
+    - bin/compile-plateau-doc.sh   # small real corpus doc -> presentation + site-gen
+  corpora:
+    metanorma-iso:
+      - repo: metanorma/mn-samples-iso
+        ref: main
+        documents: [ISO 10303-2]
+        budget: 300
+      - repo: metanorma/mn-samples-iso-private   # token'd checkout at runtime
+        budget: 600
+    metanorma-jis:
+      - repo: metanorma/mn-samples-jis
+        budget: 240
+    metanorma-cli:                               # the terminus gates the union
+      - repo: metanorma/mn-samples-iso
+        ref: main
+        documents: [ISO 10303-2]
+        budget: 300
+      - repo: metanorma/mn-samples-iso-private
+        budget: 600
+      - repo: metanorma/mn-samples-jis
+        budget: 240
+# no finals without explicit approval (ancora approve) - the guardrail
+# until two supervised waves complete clean
+promote_approval: manual

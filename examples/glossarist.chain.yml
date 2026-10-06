@@ -1,0 +1,10 @@
+# The glossarist chain: a single-gem library chain with no CLI - the
+# terminus is the gem itself. The explicit inventory works even when
+# the collector scan has no glossarist node (no graph deps known: the
+# gem is planned from its own drift alone). To fold glossarist into
+# another chain instead, add `glossarist` to that chain's
+# inventory.gems and drop this file.
+name: glossarist
+inventory:
+  gems: [glossarist]
+terminus: [glossarist]

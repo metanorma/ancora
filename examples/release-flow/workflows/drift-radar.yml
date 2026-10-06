@@ -1,0 +1,47 @@
+# DRAFT: the standing drift radar - refresh the collector snapshot and
+# report floorless edges, stale pins, prerelease floors, and unreleased
+# main. The feed for cimas-drift-audit class (h).
+name: drift-radar
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+
+      - name: refresh collector data
+        run: rake collect
+
+      - name: install ancora
+        run: gem install ancora
+
+      - name: drift report (whole fleet)
+        run: |
+          ancora drift --network data/network.json --delta data/delta.json
+          ancora drift --network data/network.json --delta data/delta.json \
+            --chain chain.yml
+
+      - name: commit refreshed data
+        run: |
+          git config user.name "ancora"
+          git config user.email "open.source@ribose.com"
+          git add data
+          if ! git diff --cached --quiet; then
+            git pull --rebase
+            git push
+          fi
