@@ -30,8 +30,8 @@ module Ancora
     DEFAULT_CORPUS_BUDGET = 600
 
     def self.load(path)
-      data = YAML.safe_load_file(path, permitted_classes: [],
-                                       aliases: false)
+      data = YAML.safe_load(File.read(path),
+                            permitted_classes: [], aliases: false)
       unless data.is_a?(Hash)
         raise ConfigError,
               "#{path}: expected a mapping at the top level"
@@ -97,8 +97,22 @@ module Ancora
         raise ConfigError, "#{path}: canary corpora must map gem -> list of entries"
       end
 
-      value.to_h do |gem, entries|
-        [gem.to_s, entries.map { |e| corpus_entry(path, gem.to_s, e) }]
+      entries = value.to_h do |gem, list|
+        [gem.to_s, list.map { |e| corpus_entry(path, gem.to_s, e) }]
+      end
+      reject_corpus_conflicts(entries)
+      entries
+    end
+
+    # a corpus run is per-repo: the same repo listed under different
+    # gems must carry the same ref/documents/budget, or the run is
+    # ambiguous - the config owner must decide
+    def self.reject_corpus_conflicts(entries)
+      entries.values.flatten.group_by(&:repo).each do |repo, group|
+        next if group.map { |e| [e.ref, e.documents, e.budget] }.uniq.one?
+
+        raise ConfigError, "canary corpora: #{repo} declared differently " \
+                           "across gems"
       end
     end
 
@@ -159,7 +173,8 @@ module Ancora
     end
     private_class_method :reject_unknown_keys, :string_array, :monorepos,
                          :max_attempts, :commands, :canary_commands, :corpora,
-                         :corpus_entry, :promote_approval
+                         :corpus_entry, :reject_corpus_conflicts,
+                         :promote_approval
 
     # how many gate attempts a wave gets before the machine halts for
     # humans; nil falls back to the machine default

@@ -103,7 +103,6 @@ module Ancora
     end
 
     def write(path)
-      require "fileutils"
       FileUtils.mkdir_p(File.dirname(path))
       json = JSON.pretty_generate(
         chain: @chain, state: @state,

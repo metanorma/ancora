@@ -63,10 +63,17 @@ RSpec.describe Ancora::GateLock do
     end
   end
 
+  it "omits the external section when no externals are given" do
+    chain(FleetFixture::GLOSSARIST_CHAIN) do |c|
+      gemfile = described_class.new(c, graph).gemfile
+      expect(gemfile).not_to include("external chains")
+    end
+  end
+
   it "pins external chains at their satisfying finals" do
     chain(FleetFixture::METANORMA_CHAIN) do |c|
       satisfied = Ancora::Externals::Finding.new(
-        gem: "ea", from: "metanorma-plugin-lutaml", constraints: [">= 0.6.41"],
+        gem: "ea", from: ["metanorma-plugin-lutaml"], constraints: [">= 0.6.41"],
         latest_final: "0.6.51", status: :satisfied
       )
       lock = described_class.new(c, graph, externals: [satisfied])
@@ -78,14 +85,15 @@ RSpec.describe Ancora::GateLock do
   it "marks awaiting-release externals as lock blockers" do
     chain(FleetFixture::METANORMA_CHAIN) do |c|
       awaiting = Ancora::Externals::Finding.new(
-        gem: "relaton-cli", from: "metanorma-standoc",
+        gem: "relaton-cli", from: %w[metanorma-standoc metanorma-document],
         constraints: [">= 3.0.0.pre.alpha.3"], latest_final: "2.1.3",
         status: :awaiting_release
       )
       lock = described_class.new(c, graph, externals: [awaiting])
       expect(lock.awaiting).to eq([awaiting])
       expect(lock.gemfile)
-        .to include("# AWAITING RELEASE: metanorma-standoc -> relaton-cli")
+        .to include("# AWAITING RELEASE: metanorma-standoc, metanorma-document " \
+                    "-> relaton-cli")
     end
   end
 end

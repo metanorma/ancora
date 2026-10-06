@@ -59,7 +59,9 @@ module Ancora
         @token = token
       end
 
-      # Git tags are truth for "did the release tag land".
+      # Git tags are truth for "did the release tag land". First page
+      # only (100): release checks are for fresh tags, which page one
+      # holds; deep-history queries are out of scope.
       def tags(repo)
         get(format(TAGS, repo), []).map { |t| t["name"] }
       end

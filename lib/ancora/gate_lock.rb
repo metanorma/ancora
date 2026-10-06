@@ -44,7 +44,7 @@ module Ancora
       body.concat(missing.map { |gem| "# #{gem}: no version on record" })
       body.concat(external_pins)
       body.concat(awaiting.map do |f|
-        "# AWAITING RELEASE: #{f.from} -> #{f.gem} " \
+        "# AWAITING RELEASE: #{f.from.join(', ')} -> #{f.gem} " \
           "(#{f.constraints.join(', ')}); latest final #{f.latest_final || 'none'}"
       end)
       (header + body + [""]).join("\n")
@@ -53,10 +53,11 @@ module Ancora
     private
 
     def external_pins
-      @externals.select { |f| f.status == :satisfied }
-        .sort_by(&:gem).uniq { |f| f.gem }
-        .flat_map { |f| [%(gem "#{f.gem}", "#{f.latest_final}")] }
-        .unshift("# external chains - finals (promote-gate truth)")
+      pins = @externals.select { |f| f.status == :satisfied }
+        .sort_by(&:gem).map { |f| %(gem "#{f.gem}", "#{f.latest_final}") }
+      return [] if pins.empty?
+
+      pins.unshift("# external chains - finals (promote-gate truth)")
     end
 
     def inventory

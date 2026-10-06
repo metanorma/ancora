@@ -7,6 +7,11 @@ module Ancora
   # another chain's prerelease - so a floor satisfied by no final is
   # the release-request case (the ea 0.6.41 story): file the request on
   # the external chain's repo and gate on its rubygems oracle.
+  #
+  # Findings merge every edge onto the same external gem into ONE
+  # requirement - the union all dependents impose, exactly what bundler
+  # resolves - so individually satisfiable floors that conflict in the
+  # union surface as awaiting release.
   class Externals
     Finding = Struct.new(:gem, :from, :constraints, :latest_final, :status,
                          keyword_init: true)
@@ -24,17 +29,19 @@ module Ancora
           inventory.include?(e.from) && !inventory.include?(e.to) &&
             !e.constraints.empty?
         end
-        .uniq { |e| [e.to, e.constraints] }
-        .map { |e| finding(e) }.sort_by { |f| [f.gem, f.from] }
+        .group_by(&:to)
+        .map { |gem, edges| finding(gem, edges) }.sort_by(&:gem)
     end
 
     private
 
-    def finding(edge)
-      requirement = Gem::Requirement.new(*edge.constraints)
-      finals = @oracle.finals(edge.to)
+    def finding(gem, edges)
+      constraints = edges.flat_map(&:constraints).uniq
+      requirement = Gem::Requirement.new(*constraints)
+      finals = @oracle.finals(gem)
       best = finals.find { |v| requirement.satisfied_by?(Gem::Version.new(v)) }
-      Finding.new(gem: edge.to, from: edge.from, constraints: edge.constraints,
+      Finding.new(gem: gem, from: edges.map(&:from).uniq.sort,
+                  constraints: constraints,
                   latest_final: best || finals.first,
                   status: best ? :satisfied : :awaiting_release)
     end

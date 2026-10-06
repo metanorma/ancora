@@ -156,6 +156,19 @@ RSpec.describe Ancora::Machine do
     action = machine.step(manifest)
     expect(action).to be_a(described_class::Halt)
     expect(action.reason).to include("3 attempts")
+    expect(action.reason).to include("max 3")
+  end
+
+  it "refuses a red gate naming gems outside the attempt's pins" do
+    stub_all_versions
+    machine.step(manifest, targets)
+    publish("metanorma-document", ["0.5.2.pre.alpha.1"])
+    publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+    machine.step(manifest)
+    machine.step(manifest)
+    manifest.record_gate!("red", ["metanorma-iso"])
+    expect { machine.step(manifest, "metanorma-iso" => "3.6.0") }
+      .to raise_error(described_class::Error, /metanorma-iso.*attempt 1/)
   end
 
   it "promotes from the first green attempt in wave order, finals only" do

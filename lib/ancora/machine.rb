@@ -130,6 +130,12 @@ module Ancora
     # immutable attempt-K pins
     def reopen_changed(manifest)
       previous = manifest.current_attempt
+      outsiders = previous.changed - previous.pins.keys
+      unless outsiders.empty?
+        raise Error, "changed gem(s) #{outsiders.join(', ')} are not in " \
+                     "attempt #{previous.index}'s pins"
+      end
+
       pins = previous.pins.merge(previous.changed.to_h do |gem|
         [gem, fresh_candidate(gem, previous)]
       end)
@@ -176,7 +182,7 @@ module Ancora
 
     def halt_reason(manifest)
       "halted after #{manifest.attempts.size} attempts " \
-        "(max #{@chain.max_attempts}); attempt history kept for humans"
+        "(max #{max_attempts}); attempt history kept for humans"
     end
 
     def max_attempts

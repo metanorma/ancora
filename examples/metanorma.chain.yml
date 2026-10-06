@@ -37,6 +37,7 @@ canary:
     metanorma-cli:                               # the terminus gates the union
       - repo: metanorma/mn-samples-iso
         ref: main
+        documents: [ISO 10303-2]
         budget: 300
       - repo: metanorma/mn-samples-iso-private
         budget: 600

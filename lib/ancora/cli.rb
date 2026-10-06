@@ -72,7 +72,7 @@ module Ancora
       lock = GateLock.new(chain, graph, externals: findings)
       puts lock.gemfile
       unless lock.awaiting.empty?
-        lock.awaiting.each { |f| warn "gate lock blocked: #{f.from} -> #{f.gem}" }
+        lock.awaiting.each { |f| warn "gate lock blocked: #{f.from.join(', ')} -> #{f.gem}" }
         return 1
       end
       0
@@ -125,10 +125,11 @@ module Ancora
       puts "external needs of chain #{chain.name} (#{findings.size})"
       satisfied = findings.select { |f| f.status == :satisfied }
       section(satisfied, "satisfied by finals") do |f|
-        "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')}): final #{f.latest_final}"
+        "#{f.from.join(', ')} -> #{f.gem} (#{f.constraints.join(', ')}): " \
+          "final #{f.latest_final}"
       end
       section(findings - satisfied, "awaiting release (file a request)") do |f|
-        "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')}): " \
+        "#{f.from.join(', ')} -> #{f.gem} (#{f.constraints.join(', ')}): " \
           "latest final #{f.latest_final || 'none'}"
       end
       satisfied.size == findings.size ? 0 : 1

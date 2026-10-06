@@ -145,6 +145,25 @@ RSpec.describe Ancora::Chain do
     end
   end
 
+  it "rejects the same corpus declared differently across gems" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "chain.yml")
+      File.write(path, <<~YAML)
+        name: x
+        canary:
+          corpora:
+            gem-a:
+              - repo: r/c
+                budget: 300
+            gem-b:
+              - repo: r/c
+                budget: 600
+      YAML
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, %r{r/c declared differently})
+    end
+  end
+
   it "rejects a terminus outside the inventory" do
     chain("name: metanorma\ninventory:\n  orgs: [metanorma]\nterminus: [lutaml]\n") do |c|
       expect { c.terminus(graph) }

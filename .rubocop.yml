@@ -18,3 +18,8 @@ plugins:
 AllCops:
   # local repo-specific modifications: match this gemspec's declared floor
   TargetRubyVersion: 3.0
+
+Style/YAMLFileRead:
+  # YAML.safe_load_file is psych 4+ (Ruby 3.1+); this gem declares
+  # Ruby >= 3.0, where only YAML.safe_load exists
+  Enabled: false

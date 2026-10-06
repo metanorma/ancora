@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "cgi"
+require "fileutils"
 require "json"
 require "net/http"
 require "rubygems"
