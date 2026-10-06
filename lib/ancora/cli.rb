@@ -27,6 +27,7 @@ module Ancora
       when "plan" then plan
       when "pin" then return pin
       when "drift" then drift
+      when "externals" then return externals
       when "check" then check
       when "tag" then tag
       when "ci" then ci
@@ -95,6 +96,31 @@ module Ancora
           "#{u.gem}: never released (main #{u.main_version})"
         end
       end
+    end
+
+    # external-chain needs of a chain: floors pointing outside the
+    # inventory, checked against the oracle for satisfying FINALS. A
+    # need awaiting release is the cross-chain release-request case.
+    def externals
+      options = { delta: nil, seeds: [], chain: nil }
+      parse_graph_options(options)
+
+      chain = load_chain(options)
+      return usage unless chain
+
+      graph = Graph.load(options.fetch(:network), options[:delta])
+      findings = Externals.new(graph, chain: chain,
+                                      oracle: Oracle::Rubygems.new).check
+      puts "external needs of chain #{chain.name} (#{findings.size})"
+      satisfied = findings.select { |f| f.status == :satisfied }
+      section(satisfied, "satisfied by finals") do |f|
+        "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')}): final #{f.latest_final}"
+      end
+      section(findings - satisfied, "awaiting release (file a request)") do |f|
+        "#{f.from} -> #{f.gem} (#{f.constraints.join(', ')}): " \
+          "latest final #{f.latest_final || 'none'}"
+      end
+      0
     end
 
     def section(items, title)
@@ -259,6 +285,7 @@ module Ancora
       warn "usage: ancora plan --network PATH [--delta PATH] [--chain chain.yml] [--seeds a,b]"
       warn "       ancora pin --chain chain.yml --network PATH [--delta PATH]"
       warn "       ancora drift --network PATH [--delta PATH] [--chain chain.yml]"
+      warn "       ancora externals --chain chain.yml --network PATH [--delta PATH]"
       warn "       ancora check GEM VERSION"
       warn "       ancora tag OWNER/REPO VERSION"
       warn "       ancora ci OWNER/REPO [BRANCH]"

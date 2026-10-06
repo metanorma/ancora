@@ -1,7 +1,7 @@
-= metanorma/release — runtime template (DRAFT)
+= metanorma/release-flow — runtime template (DRAFT)
 
 This directory is the reviewable template for the per-org release repo
-(`metanorma/release` and, later, lutaml/relaton/glossarist). Nothing here runs
+(`metanorma/release-flow` and, later, lutaml/relaton/glossarist). Nothing here runs
 from inside the ancora engine repo — copy the tree when the repo is created.
 
 == Why a dedicated repo

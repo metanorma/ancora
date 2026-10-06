@@ -22,7 +22,10 @@ module FleetFixture
     },
     "metanorma/metanorma-document" => {
       "name" => "metanorma-document", "main_version" => "0.5.1",
-      "deps" => [{ "name" => "glossarist", "constraints" => ["~> 2.14.1"] }]
+      "deps" => [
+        { "name" => "glossarist", "constraints" => ["~> 2.14.1"] },
+        { "name" => "sts", "constraints" => [">= 0.5"] },
+      ]
     },
     "metanorma/metanorma-plugin-lutaml" => {
       "name" => "metanorma-plugin-lutaml", "main_version" => "0.7.54",

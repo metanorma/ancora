@@ -67,8 +67,8 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 ## M2 — GHA runtime wiring
 
-- [ ] `metanorma/release` repo: `chain.yml` config + the `release-wave` workflow —
-      TEMPLATE SCAFFOLDED at `examples/release-repo/` (chain.yml of record,
+- [ ] `metanorma/release-flow` repo: `chain.yml` config + the `release-wave` workflow —
+      TEMPLATE SCAFFOLDED at `examples/release-flow/` (chain.yml of record,
       workflows/release-wave.yml step-per-run with manifest commit-back and
       rebase-retry, workflows/drift-radar.yml, bin/run-action executing the
       action JSON; gate runner and notify paths marked TODO). Creating the repo
@@ -115,10 +115,17 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 ## M5 — external chains + handshakes
 
-- [ ] lutaml/release, relaton/release, glossarist/release with the same engine +
-      their chain.yml
-- [ ] Candidate mirroring: candidate-gates may pin an external chain's latest GREEN
-      candidate; promote-gates require the external chain's FINALS
+- [ ] lutaml/release-flow, relaton/release-flow, glossarist/release-flow with the same
+      engine + their chain.yml (renamed from `release` 2026-10-06: role-named per
+      industry survey — kubernetes/release, golang/release, nodejs/release-tools,
+      flutter/infra — and to avoid colliding with the existing metanorma-release gem)
+- [x] Candidate mirroring / promote-gate externals (ENGINE SIDE): `ancora externals`
+      checks every floor pointing outside a chain's inventory (including gems without
+      collector nodes) against the rubygems oracle — satisfied by a FINAL vs awaiting
+      release (nothing promotes against another chain's prerelease). Live 2026-10-06:
+      57 satisfied, 5 awaiting (pubid/relaton prerelease coupling + the
+      metanorma-cli→metanorma-nist ~> 2.7.0 floor). Runtime-side mirroring (pin the
+      external chain's latest GREEN candidate in gate locks) still to wire.
 - [ ] Release-request handshake: when metanorma needs an unreleased external API
       (the ea 0.6.41 case), file a release request on the external chain repo and
       gate on its rubygems oracle

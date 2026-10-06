@@ -26,6 +26,13 @@ module Ancora
           .map(&:to_i).max.to_i
       end
 
+      # released finals only, newest first - the promote-gate truth for
+      # external chains (nothing promotes against a prerelease)
+      def finals(gem)
+        versions(gem).map { |v| v["number"] }
+          .reject { |n| Gem::Version.new(n).prerelease? }
+      end
+
       private
 
       def versions(gem)

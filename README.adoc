@@ -69,6 +69,7 @@ bundle exec exe/ancora drift --network network.json --delta delta.json
 bundle exec exe/ancora check metanorma-plugin-lutaml 0.7.54
 bundle exec exe/ancora tag metanorma/metanorma-cli 1.17.0
 bundle exec exe/ancora ci metanorma/metanorma-cli
+bundle exec exe/ancora externals --chain examples/metanorma.chain.yml --network network.json --delta delta.json
 ----
 
 `check`, `tag`, and `ci` query the three read-only oracles the engine trusts:
@@ -77,7 +78,10 @@ them; the wave state machine is a cache over them.
 
 `drift` reports the four standing findings over the fleet or a single chain:
 floorless edges, stale pins (floors that no longer admit the dependency's
-main), prerelease floors (the lint class), and unreleased main.
+main), prerelease floors (the lint class), and unreleased main. `externals`
+checks a chain's floors that point outside its inventory against the rubygems
+oracle: nothing promotes against another chain's prerelease, so a need only a
+prerelease satisfies is the cross-chain release-request case.
 
 == The step-per-run state machine
 

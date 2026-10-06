@@ -19,6 +19,7 @@ module Ancora
   autoload :Oracle, "ancora/oracle"
   autoload :Candidate, "ancora/candidate"
   autoload :Drift, "ancora/drift"
+  autoload :Externals, "ancora/externals"
   autoload :GateLock, "ancora/gate_lock"
   autoload :GateRecipe, "ancora/gate_recipe"
   autoload :Machine, "ancora/machine"

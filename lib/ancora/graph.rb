@@ -12,6 +12,14 @@ module Ancora
 
     attr_reader :nodes, :edges
 
+    # Edges whose target has no node in the collected data (external
+    # chains and third-party gems the scan does not cover). Kept apart
+    # so wave planning and drift stay scoped to the collected fleet,
+    # while the externals check can still see the floors.
+    def external_edges
+      @external_edges ||= []
+    end
+
     def self.load(network_path, delta_path = nil)
       network = JSON.parse(File.read(network_path))
       delta = delta_path && File.file?(delta_path) ? JSON.parse(File.read(delta_path)) : {}
@@ -35,23 +43,24 @@ module Ancora
       end
 
       edges = []
+      external = []
       network.each_value do |g|
         next unless g["name"]
 
         (g["deps"] || []).each do |dep|
           target = nodes[dep["name"]]
-          next unless target
-
-          edges << Edge.new(from: g["name"], to: dep["name"],
-                            constraints: dep["constraints"])
+          edge = Edge.new(from: g["name"], to: dep["name"],
+                          constraints: dep["constraints"])
+          target ? (edges << edge) : (external << edge)
         end
       end
-      new(nodes, edges)
+      new(nodes, edges, external)
     end
 
-    def initialize(nodes, edges)
+    def initialize(nodes, edges, external_edges = [])
       @nodes = nodes
       @edges = edges
+      @external_edges = external_edges
       rebuild_indices
     end
 
