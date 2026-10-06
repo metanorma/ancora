@@ -101,6 +101,20 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
       pinned candidate set. Unit-green does not mean works: cg3 passed its whole
       semantic-XML pipeline and failed only at site-gen citation rendering
       (Relaton::Render::I18n) on 2026-10-05.
+- [ ] CORPUS GATE (wave-passing requirement, 2026-10-06): a wave is not green on gem
+      suites alone — it must also validate against the mn-samples-* corpus repos:
+      mn-samples-{iso,ieee,jis,nist,bsi,iec,iho,ogc,...}[-private]. This is CONFIG on
+      the wave's passing requirements, not an ad-hoc step: chain.yml `canary:` grows a
+      `corpora:` map naming which corpora gate which wave/gem (e.g. metanorma-iso wave
+      -> mn-samples-iso[-private]; metanorma-jis wave -> mn-samples-jis; metanorma
+      terminus -> the union), each entry carrying {ref, documents, budget}. Gate rule:
+      every configured corpus compiles end-to-end green against the GateLock candidate
+      set — same principle as the canary bullet above, scaled to per-flavor real
+      corpora (the -private variants carry the content that actually breaks on flavor
+      drift). Runtime notes: -private repos need a token'd checkout (GHA secrets);
+      public ones clone as-is; each corpus run is one workflow dispatch, poll via the
+      CI oracle like a gem suite. The engine only enforces that the CONFIGURED corpora
+      passed — it never infers coverage; curating the mapping is the chain owner's job.
 - [ ] Attempt loop: red gate -> fix on main -> alpha.N+1 only for changed gems ->
       re-gate; max_attempts (default 3) then halt for humans with the attempt history
 
