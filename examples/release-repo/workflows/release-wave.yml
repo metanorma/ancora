@@ -1,0 +1,64 @@
+# DRAFT: the step-per-run runtime. One workflow run = ONE transition:
+# query the oracles via ancora, execute the returned action, commit the
+# manifest, exit. The schedule continues the wave (poll -> gate ->
+# promote); duplicate runs are safe - the manifest is the lock
+# (rebase-and-retry) and the gem release workflows' push guards make
+# duplicate dispatches no-ops.
+name: release-wave
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: print the action, execute nothing
+        type: boolean
+        default: true
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  step:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+
+      - name: refresh collector data
+        run: rake collect
+
+      - name: install ancora
+        run: gem install ancora
+
+      - name: one transition
+        run: |
+          ancora step --chain chain.yml \
+            --network data/network.json --delta data/delta.json \
+            --manifest state/waves.json --format json > action.json
+          cat action.json
+
+      - name: execute the action
+        if: ${{ !inputs.dry_run }}
+        run: bin/run-action action.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      # the manifest repo is the lock: on push conflict, rebase and retry
+      - name: commit the manifest
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "ancora"
+          git config user.email "open.source@ribose.com"
+          git add state/waves.json
+          if ! git diff --cached --quiet; then
+            git pull --rebase
+            git push
+          fi

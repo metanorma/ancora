@@ -67,11 +67,14 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 ## M2 — GHA runtime wiring
 
-- [ ] `metanorma/release` repo: `chain.yml` config (inventory, roots/terminus,
-      candidate set, soak window, promote approval, gate commands, ruby matrix,
-      external chains with needs) + the `release-wave` workflow (inputs: wave, dry_run)
-      — the config SURFACE (chain.yml schema) and its engine consumption exist here;
-      the repo + workflow do not yet
+- [ ] `metanorma/release` repo: `chain.yml` config + the `release-wave` workflow —
+      TEMPLATE SCAFFOLDED at `examples/release-repo/` (chain.yml of record,
+      workflows/release-wave.yml step-per-run with manifest commit-back and
+      rebase-retry, workflows/drift-radar.yml, bin/run-action executing the
+      action JSON; gate runner and notify paths marked TODO). Creating the repo
+      is the remaining org-visible step. The action contract is
+      `ancora step --format json`: dispatch_wave | gate | promote_wave | hold |
+      halt | done.
 - [x] Step-per-run state machine: one workflow run performs ONE transition (dispatch,
       poll, gate step, promote step), commits the manifest, exits; next step continues
       via workflow_dispatch/schedule — waves exceed the 6h single-run limit

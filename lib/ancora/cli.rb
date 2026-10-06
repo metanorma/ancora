@@ -68,6 +68,7 @@ module Ancora
 
       graph = Graph.load(options.fetch(:network), options[:delta])
       puts GateLock.new(chain, graph).gemfile
+      0
     end
 
     def drift
@@ -114,9 +115,10 @@ module Ancora
 
     # one transition per invocation: the dry-run of the step-per-run
     # state machine. Prints the action a runtime run would execute and
-    # commits the manifest cache when --manifest is given.
+    # commits the manifest cache when --manifest is given. --format json
+    # emits the action for the runtime workflow to parse.
     def step
-      options = { delta: nil, seeds: [], chain: nil, manifest: nil }
+      options = { delta: nil, seeds: [], chain: nil, manifest: nil, format: "text" }
       parse_graph_options(options)
 
       chain = load_chain(options)
@@ -127,14 +129,46 @@ module Ancora
       manifest = path ? Manifest.load(path, chain.name) : Manifest.new(chain.name)
       action = Machine.new(chain: chain, graph: graph,
                            oracle: Oracle::Rubygems.new).step(manifest)
+      emit(action, manifest, chain, graph, options[:format])
+      manifest.write(path) if path
+      0
+    end
+
+    def emit(action, manifest, chain, graph, format)
+      if format == "json"
+        puts JSON.generate(action_payload(action).merge(state: manifest.state))
+        return
+      end
+
       puts "state: #{manifest.state}"
       if action.is_a?(Machine::Gate)
         render_gate(action, chain, graph, manifest.current_attempt.pins)
       else
         render_action(action)
       end
-      manifest.write(path) if path
-      nil
+    end
+
+    # action as plain data for the runtime edge; keys are the workflow's
+    # contract with the machine
+    def action_payload(action)
+      case action
+      when Machine::DispatchWave
+        { action: "dispatch_wave", index: action.index,
+          items: payload_items(action.items) }
+      when Machine::Gate
+        { action: "gate", attempt_index: action.attempt_index }
+      when Machine::PromoteWave
+        { action: "promote_wave", index: action.index,
+          items: payload_items(action.items) }
+      when Machine::Hold then { action: "hold", reason: action.reason }
+      when Machine::Halt then { action: "halt", reason: action.reason }
+      when Machine::Done then { action: "done" }
+      else raise "unknown action #{action.class}"
+      end
+    end
+
+    def payload_items(items)
+      items.map { |i| { gem: i.gem, repo: i.repo, version: i.version } }
     end
 
     def render_gate(action, chain, graph, pins)
@@ -176,7 +210,7 @@ module Ancora
       manifest.approve!
       manifest.write(options[:manifest])
       puts "chain #{manifest.chain}: wave approved for promotion"
-      nil
+      0
     end
 
     def tag
@@ -211,6 +245,7 @@ module Ancora
         o.on("--seeds a,b,c") { |v| options[:seeds] = v.split(",") }
         o.on("--chain PATH") { |v| options[:chain] = v }
         o.on("--manifest PATH") { |v| options[:manifest] = v }
+        o.on("--format F") { |v| options[:format] = v }
       end.parse!(@argv)
     end
 

@@ -1,0 +1,44 @@
+= metanorma/release — runtime template (DRAFT)
+
+This directory is the reviewable template for the per-org release repo
+(`metanorma/release` and, later, lutaml/relaton/glossarist). Nothing here runs
+from inside the ancora engine repo — copy the tree when the repo is created.
+
+== Why a dedicated repo
+
+- `state/waves.json` is the manifest lock: committed between steps, push
+  conflicts mean rebase-and-retry, duplicate dispatches are no-ops (the gem
+  release workflows' push guards are probe-verified idempotent).
+- `release-wave.yml` is the runtime: one workflow run performs ONE transition
+  (dispatch, poll, gate, promote), commits the manifest, exits; the schedule
+  continues the wave — waves exceed the 6h single-run limit.
+- Secrets: this repo binds only a PAT with `workflow` scope; each gem still
+  publishes with its own repo's secrets.
+- The real chain.yml lives here (the engine repo's `examples/` are dry-run
+  copies).
+
+== Layout
+
+----
+chain.yml                     the chain configuration of record
+state/waves.json              the manifest (created on first step)
+data/network.json, delta.json collector snapshot (refreshed by drift radar)
+Rakefile                      collect: refresh data/ from the collector
+bin/run-action                executes one ancora action JSON
+workflows/release-wave.yml    the step-per-run runtime
+workflows/drift-radar.yml     scheduled drift report + data refresh
+----
+
+== Action contract (`ancora step --format json`)
+
+[cols="1,3"]
+|===
+| action | runtime does
+
+| `dispatch_wave` | for each item: `gh workflow run rubygems-release.yml -R <repo> --field next_version=<version>`
+| `gate` | run the gate recipe (lock, suites, canary) then record green/red on the manifest
+| `promote_wave` | dispatch finals per item, same idempotent mechanism
+| `hold` | awaiting promote approval — notify, stop
+| `halt` | attempts exhausted — notify humans with the manifest history
+| `done` | wave complete — stop the schedule
+|===

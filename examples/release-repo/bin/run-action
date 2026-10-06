@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# DRAFT: executes one ancora action (action.json from `ancora step
+# --format json`). Idempotent by construction: duplicate dispatches are
+# no-ops (the gem release workflows' push guards), and promotion
+# re-dispatch completes partial pushes.
+set -euo pipefail
+
+action_json=${1:?usage: run-action action.json}
+kind=$(jq -r '.action' "$action_json")
+
+case "$kind" in
+dispatch_wave)
+  items=$(jq -c '.items[]' "$action_json")
+  for item in $items; do
+    repo=$(jq -r '.repo' <<<"$item")
+    version=$(jq -r '.version' <<<"$item")
+    echo "dispatching $repo $version"
+    gh workflow run rubygems-release.yml -R "$repo" --ref main \
+      --field next_version="$version"
+  done
+  ;;
+promote_wave)
+  items=$(jq -c '.items[]' "$action_json")
+  for item in $items; do
+    repo=$(jq -r '.repo' <<<"$item")
+    version=$(jq -r '.version' <<<"$item")
+    echo "promoting $repo $version"
+    gh workflow run rubygems-release.yml -R "$repo" --ref main \
+      --field next_version="$version"
+  done
+  ;;
+gate)
+  # TODO(gate runner, M3): generate the lock (ancora pin --chain
+  # chain.yml with the attempt's candidates), bundle lock, run each
+  # gated gem's suite in a disposable container, run the canary corpus
+  # end-to-end including presentation/site rendering, then record the
+  # verdict on the manifest (green/red + changed gems) and commit.
+  echo "gate runner not wired yet; see ancora GateRecipe" >&2
+  exit 2
+  ;;
+hold)
+  echo "HOLD: $(jq -r '.reason' "$action_json")" >&2
+  # TODO(notify): post to the team channel; the schedule keeps polling
+  exit 3
+  ;;
+halt)
+  echo "HALT: $(jq -r '.reason' "$action_json")" >&2
+  # TODO(notify): open an issue with the attempt history
+  exit 4
+  ;;
+done)
+  echo "wave complete; disable the release-wave schedule"
+  ;;
+*)
+  echo "unknown action: $kind" >&2
+  exit 1
+  ;;
+esac
