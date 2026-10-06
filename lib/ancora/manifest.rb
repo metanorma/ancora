@@ -17,15 +17,17 @@ module Ancora
       new(data.fetch("chain", fallback_chain ||
                      File.basename(File.dirname(path))),
           data.fetch("state", "planned"), data.fetch("attempts", []),
-          data.fetch("wave_cursor", 0), data.fetch("promote_cursor", 0))
+          data.fetch("wave_cursor", 0), data.fetch("promote_cursor", 0),
+          data.fetch("approved", false))
     end
 
     def initialize(chain, state = "planned", attempts = [], wave_cursor = 0,
-                   promote_cursor = 0)
+                   promote_cursor = 0, approved = false)
       @chain = chain
       @state = state
       @wave_cursor = wave_cursor
       @promote_cursor = promote_cursor
+      @approved = approved
       @attempts = attempts.map do |a|
         Attempt.new(index: a["index"], pins: a["pins"],
                     created_at: a["created_at"],
@@ -33,6 +35,15 @@ module Ancora
                     gate_result: a["gate_result"],
                     changed: a.fetch("changed", []))
       end
+    end
+
+    def approved?
+      @approved
+    end
+
+    def approve!
+      @approved = true
+      self
     end
 
     def open_attempt(pins, waves = [])
@@ -97,6 +108,7 @@ module Ancora
       json = JSON.pretty_generate(
         chain: @chain, state: @state,
         wave_cursor: @wave_cursor, promote_cursor: @promote_cursor,
+        approved: @approved,
         attempts: @attempts.map do |a|
           { index: a.index, pins: a.pins, created_at: a.created_at,
             waves: a.waves, gate_result: a.gate_result, changed: a.changed }

@@ -88,9 +88,11 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 - [ ] Candidate dispatch: on green main, dispatch next_version=X.Y.Z.pre.alpha.N via
       the gem repo's release workflow; poll the rubygems oracle until visible
-- [ ] Gate-lock generator: emit a Gemfile pinning the ENTIRE candidate set (bundler
+- [x] Gate-lock generator: emit a Gemfile pinning the ENTIRE candidate set (bundler
       never resolves prereleases implicitly — exact pins, multi-level candidates
-      included); `bundle lock`; run each next-wave gem's suite in a disposable container
+      included); run each next-wave gem's suite in a disposable container
+      (`GateLock` + `GateRecipe`: lock + per-gem suite commands + canary commands
+      from chain.yml `gate:`/`canary:`; the actual container run is runtime-side)
 - [ ] CANARY STAGE (mandatory — the campaign's core lesson): compile a small REAL
       corpus document end-to-end INCLUDING presentation/site rendering against the
       pinned candidate set. Unit-green does not mean works: cg3 passed its whole
@@ -103,7 +105,10 @@ gem covers only 7/30 org gems; ea/xmi/oscal feed the metanorma chain instead).
 
 - [ ] Promote step: finals in wave order (idempotent dispatches), floors raised to
       finals, dependents re-locked, terminus last + wave manifest in release notes
-- [ ] Guardrail: promote approval = manual until two supervised waves complete clean
+- [x] Guardrail: promote approval = manual until two supervised waves complete clean
+      (chain.yml `promote_approval: manual` is the DEFAULT; the machine Holds a green
+      wave until `ancora approve --manifest` records the human's approval; relax per
+      chain only after two clean supervised waves)
 
 ## M5 — external chains + handshakes
 

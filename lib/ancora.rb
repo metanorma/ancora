@@ -20,6 +20,7 @@ module Ancora
   autoload :Candidate, "ancora/candidate"
   autoload :Drift, "ancora/drift"
   autoload :GateLock, "ancora/gate_lock"
+  autoload :GateRecipe, "ancora/gate_recipe"
   autoload :Machine, "ancora/machine"
   autoload :Manifest, "ancora/manifest"
   autoload :CLI, "ancora/cli"

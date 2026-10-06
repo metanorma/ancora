@@ -209,6 +209,33 @@ RSpec.describe Ancora::Machine do
     expect(manifest.state).to eq "promoted"
   end
 
+  it "holds a green wave until a human approves promotion" do
+    chain = FleetFixture.load_chain(FleetFixture::METANORMA_CHAIN.gsub(
+                                      "promote_approval: none", "promote_approval: manual"
+                                    ))
+    step = lambda do
+      described_class.new(chain: chain, graph: graph,
+                          oracle: Ancora::Oracle::Rubygems.new).step(manifest)
+    end
+    stub_all_versions
+    step.call
+    publish("metanorma-document", ["0.5.2.pre.alpha.1"])
+    publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+    step.call
+    step.call
+    manifest.record_gate!("green")
+
+    action = step.call
+    expect(action).to be_a(described_class::Hold)
+    expect(action.reason).to include("promote approval")
+    expect(manifest.state).to eq "gating"
+
+    manifest.approve!
+    action = step.call
+    expect(action).to be_a(described_class::PromoteWave)
+    expect(manifest.state).to eq "promoted"
+  end
+
   it "runs the glossarist single-gem chain through its whole lifecycle" do
     chain = FleetFixture.load_chain(FleetFixture::GLOSSARIST_CHAIN)
     m = described_class.new(chain: chain, graph: graph,

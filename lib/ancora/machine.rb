@@ -17,6 +17,7 @@ module Ancora
     Gate = Struct.new(:attempt_index, keyword_init: true)
     PromoteWave = Struct.new(:index, :items, keyword_init: true)
     Halt = Struct.new(:reason, keyword_init: true)
+    Hold = Struct.new(:reason, keyword_init: true)
     Done = Struct.new(:state, keyword_init: true)
 
     DEFAULT_MAX_ATTEMPTS = 3
@@ -71,6 +72,8 @@ module Ancora
 
     def gating_step(manifest)
       if (green = manifest.promoted_from)
+        return hold_for_approval(green) if approval_required?(manifest)
+
         manifest.start_promotion(green)
         return promote_wave(manifest, 0)
       end
@@ -79,6 +82,16 @@ module Ancora
       return Gate.new(attempt_index: manifest.current_attempt.index) unless manifest.current_attempt.gate_result == "red"
 
       reopen_changed(manifest)
+    end
+
+    # the guardrail: no finals without explicit approval
+    def approval_required?(manifest)
+      @chain.promote_approval == "manual" && !manifest.approved?
+    end
+
+    def hold_for_approval(attempt)
+      Hold.new(reason: "attempt #{attempt.index} is green; awaiting promote " \
+                       "approval (ancora approve --manifest ...)")
     end
 
     def promoted_step(manifest)

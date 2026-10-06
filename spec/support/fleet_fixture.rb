@@ -123,6 +123,11 @@ module FleetFixture
       orgs: [metanorma]
       roots: [metanorma-cli]
     terminus: [metanorma-cli]
+    gate:
+      commands: [bundle exec rspec]
+    canary:
+      commands: [bundle exec rake site]
+    promote_approval: none
   YAML
 
   LUTAML_CHAIN = <<~YAML
@@ -145,6 +150,7 @@ module FleetFixture
     inventory:
       gems: [glossarist]
     terminus: [glossarist]
+    promote_approval: none
   YAML
 
   # Loads a chain.yml from its text, for specs that vary the config.

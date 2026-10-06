@@ -67,6 +67,35 @@ RSpec.describe Ancora::Chain do
     end
   end
 
+  it "parses the gate, canary, and promote-approval runtime surface" do
+    chain(FleetFixture::METANORMA_CHAIN) do |c|
+      expect(c.gate_commands).to eq(["bundle exec rspec"])
+      expect(c.canary_commands).to eq(["bundle exec rake site"])
+      expect(c.promote_approval).to eq "none"
+    end
+  end
+
+  it "defaults promote approval to manual (the guardrail)" do
+    chain(FleetFixture::LUTAML_CHAIN) do |c|
+      expect(c.promote_approval).to eq "manual"
+      expect(c.gate_commands).to be_empty
+      expect(c.canary_commands).to be_empty
+    end
+  end
+
+  it "rejects unknown gate keys and bad approval values" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "chain.yml")
+      File.write(path, "name: x\ngate:\n  commandz: []\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, /unknown key/)
+
+      File.write(path, "name: x\npromote_approval: maybe\n")
+      expect { described_class.load(path) }
+        .to raise_error(Ancora::Chain::ConfigError, /promote_approval/)
+    end
+  end
+
   it "rejects a terminus outside the inventory" do
     chain("name: metanorma\ninventory:\n  orgs: [metanorma]\nterminus: [lutaml]\n") do |c|
       expect { c.terminus(graph) }

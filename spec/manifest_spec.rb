@@ -44,6 +44,19 @@ RSpec.describe Ancora::Manifest do
     end
   end
 
+  it "round-trips promote approval through disk" do
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "waves.json")
+      m = described_class.new("metanorma")
+      m.open_attempt({ "ea" => "0.6.42.pre.alpha.1" })
+      m.record_gate!("green")
+      expect(described_class.load(path).approved?).to be false
+      m.approve!
+      m.write(path)
+      expect(described_class.load(path).approved?).to be true
+    end
+  end
+
   it "starts promotion only from a green attempt" do
     m = described_class.new("metanorma")
     m.open_attempt({ "ea" => "0.6.42.pre.alpha.1" })

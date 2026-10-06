@@ -11,3 +11,15 @@ inventory:
 # the terminus must be alone in the final wave of any plan that
 # reaches it; promotion embeds the wave manifest in its release notes
 terminus: [metanorma-cli]
+# the integration gate: every wave gem's suite runs against a lock
+# pinning the ENTIRE candidate set, then the canary compiles a real
+# corpus document end-to-end including site rendering (the cg3 lesson:
+# unit-green does not mean works)
+gate:
+  commands: [bundle exec rspec]
+canary:
+  commands:
+    - bin/compile-plateau-doc.sh   # small real corpus doc -> presentation + site-gen
+# no finals without explicit approval (ancora approve) - the guardrail
+# until two supervised waves complete clean
+promote_approval: manual

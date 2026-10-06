@@ -18,8 +18,10 @@ module Ancora
 
     Unit = Struct.new(:repo, :gems, keyword_init: true)
 
-    TOP_LEVEL_KEYS = %w[name inventory monorepos terminus max_attempts].freeze
+    TOP_LEVEL_KEYS = %w[name inventory monorepos terminus max_attempts gate canary
+                        promote_approval].freeze
     INVENTORY_KEYS = %w[orgs roots gems exclude].freeze
+    APPROVAL_MODES = %w[manual none].freeze
 
     def self.load(path)
       data = YAML.safe_load_file(path, permitted_classes: [],
@@ -46,6 +48,9 @@ module Ancora
         monorepos: monorepos(path, data["monorepos"]),
         terminus: string_array("#{path}: terminus", data["terminus"]),
         max_attempts: max_attempts(path, data["max_attempts"]),
+        gate_commands: commands(path, "gate", data["gate"]),
+        canary_commands: commands(path, "canary", data["canary"]),
+        promote_approval: promote_approval(path, data["promote_approval"]),
       )
     end
 
@@ -56,6 +61,24 @@ module Ancora
       end
 
       value
+    end
+
+    def self.commands(path, section, value)
+      return [] if value.nil?
+      unless value.is_a?(Hash)
+        raise ConfigError, "#{path}: #{section} must be a mapping"
+      end
+
+      reject_unknown_keys("#{path}: #{section}:", value.keys, ["commands"])
+      string_array("#{path}: #{section}: commands", value["commands"])
+    end
+
+    def self.promote_approval(path, value)
+      return "manual" if value.nil? # the guardrail: no finals without approval
+      return value if APPROVAL_MODES.include?(value)
+
+      raise ConfigError, "#{path}: promote_approval must be one of " \
+                         "#{APPROVAL_MODES.join(', ')}"
     end
 
     def self.reject_unknown_keys(where, keys, allowed)
@@ -85,14 +108,20 @@ module Ancora
       end
     end
     private_class_method :reject_unknown_keys, :string_array, :monorepos,
-                         :max_attempts
+                         :max_attempts, :commands, :promote_approval
 
     # how many gate attempts a wave gets before the machine halts for
     # humans; nil falls back to the machine default
-    attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos, :max_attempts
+    attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos,
+                :max_attempts, :gate_commands, :canary_commands
+
+    def promote_approval
+      @promote_approval
+    end
 
     def initialize(name:, orgs: [], roots: [], gems: [], exclude: [], monorepos: {},
-                   terminus: [], max_attempts: nil)
+                   terminus: [], max_attempts: nil, gate_commands: [],
+                   canary_commands: [], promote_approval: "manual")
       @name = name
       @orgs = orgs.freeze
       @roots = roots.freeze
@@ -101,6 +130,9 @@ module Ancora
       @monorepos = monorepos.freeze
       @terminus_gems = terminus.freeze
       @max_attempts = max_attempts
+      @gate_commands = gate_commands.freeze
+      @canary_commands = canary_commands.freeze
+      @promote_approval = promote_approval
     end
 
     # The gems this chain manages and pins as a whole, resolved against

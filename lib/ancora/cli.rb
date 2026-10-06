@@ -31,6 +31,7 @@ module Ancora
       when "tag" then tag
       when "ci" then ci
       when "step" then return step
+      when "approve" then return approve
       else return usage
       end
       0
@@ -127,9 +128,24 @@ module Ancora
       action = Machine.new(chain: chain, graph: graph,
                            oracle: Oracle::Rubygems.new).step(manifest)
       puts "state: #{manifest.state}"
-      render_action(action)
+      if action.is_a?(Machine::Gate)
+        render_gate(action, chain, graph, manifest.current_attempt.pins)
+      else
+        render_action(action)
+      end
       manifest.write(path) if path
       nil
+    end
+
+    def render_gate(action, chain, graph, pins)
+      recipe = GateRecipe.new(chain, graph).build(pins)
+      pin_count = recipe.lockfile.lines.count { |l| l.start_with?('gem "') }
+      puts "gate attempt #{action.attempt_index}: #{pin_count} exact pins"
+      recipe.suites.each do |s|
+        cmds = s.commands.empty? ? "(chain declares no suite commands)" : s.commands.join(" && ")
+        puts "  suite #{s.gem} (#{s.repo}): #{cmds}"
+      end
+      recipe.canary.each { |c| puts "  canary: #{c}" }
     end
 
     def render_action(action)
@@ -143,9 +159,24 @@ module Ancora
       when Machine::PromoteWave
         puts "promote wave #{action.index + 1} finals:"
         action.items.each { |i| puts "  #{i.gem} #{i.version} (#{i.repo})" }
+      when Machine::Hold then puts "HOLD: #{action.reason}"
       when Machine::Halt then puts "HALT: #{action.reason}"
       when Machine::Done then puts "wave done"
       end
+    end
+
+    def approve
+      options = { manifest: nil }
+      OptionParser.new do |o|
+        o.on("--manifest PATH") { |v| options[:manifest] = v }
+      end.parse!(@argv)
+      return usage unless options[:manifest]
+
+      manifest = Manifest.load(options[:manifest])
+      manifest.approve!
+      manifest.write(options[:manifest])
+      puts "chain #{manifest.chain}: wave approved for promotion"
+      nil
     end
 
     def tag
@@ -197,6 +228,7 @@ module Ancora
       warn "       ancora tag OWNER/REPO VERSION"
       warn "       ancora ci OWNER/REPO [BRANCH]"
       warn "       ancora step --chain chain.yml --network PATH --delta PATH [--manifest PATH]"
+      warn "       ancora approve --manifest PATH"
       1
     end
   end
