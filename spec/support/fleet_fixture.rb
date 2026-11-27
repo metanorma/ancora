@@ -80,6 +80,12 @@ module FleetFixture
     },
   }.freeze
 
+  # the gate specs pin metanorma-iso, which the shared fleet leaves out
+  GATE_NETWORK = NETWORK.merge(
+    "metanorma/metanorma-iso" => { "name" => "metanorma-iso",
+                                   "main_version" => "3.5.1", "deps" => [] },
+  ).freeze
+
   DELTA = {
     "metanorma/metanorma-cli" => {
       "gem" => "metanorma-cli", "main_version" => "1.17.0",

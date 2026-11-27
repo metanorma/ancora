@@ -20,11 +20,33 @@ module Ancora
       @external_edges ||= []
     end
 
+    class Invalid < ArgumentError; end
+
     def self.load(network_path, delta_path = nil)
-      network = JSON.parse(File.read(network_path))
+      network = read_network(network_path)
       delta = delta_path && File.file?(delta_path) ? JSON.parse(File.read(delta_path)) : {}
       from_data(network, delta)
     end
+
+    def self.read_network(path)
+      network = JSON.parse(File.read(path))
+      return network if network.is_a?(Hash)
+
+      raise Invalid, "#{path}: network must be a JSON object"
+    rescue Errno::ENOENT
+      raise Invalid, "#{path}: no such network file"
+    rescue JSON::ParserError => e
+      raise Invalid, "#{path}: not JSON (#{e.message.lines.first.strip})"
+    end
+    private_class_method :read_network
+
+    def self.constraints_of(from, dep)
+      list = dep["constraints"] || []
+      return list if list.is_a?(Array)
+
+      raise Invalid, "#{from} -> #{dep['name']}: constraints must be a list of requirement strings, got #{list.inspect}"
+    end
+    private_class_method :constraints_of
 
     def self.from_data(network, delta)
       delta_by_gem = {}
@@ -50,7 +72,7 @@ module Ancora
         (g["deps"] || []).each do |dep|
           target = nodes[dep["name"]]
           edge = Edge.new(from: g["name"], to: dep["name"],
-                          constraints: dep["constraints"])
+                          constraints: constraints_of(g["name"], dep))
           target ? (edges << edge) : (external << edge)
         end
       end

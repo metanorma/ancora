@@ -70,6 +70,16 @@ module Ancora
         tags(repo).include?("v#{version}")
       end
 
+      # :tagged or :missing when GitHub answered, :unknown when it did not
+      # (auth, rate limit, outage): an unanswered query must not read as
+      # "no tag".
+      def tag_status(repo, version)
+        tags = get(format(TAGS, repo), nil)
+        return :unknown unless tags
+
+        tags.any? { |t| t["name"] == "v#{version}" } ? :tagged : :missing
+      end
+
       # CI runs are truth for "is the branch green". The rake workflow
       # gates releases; a pending run is not green.
       def latest_run(repo, branch: "main", workflow: "rake")

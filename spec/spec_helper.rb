@@ -7,3 +7,4 @@ require "webmock/rspec"
 
 WebMock.disable_net_connect!
 require_relative "support/fleet_fixture"
+require_relative "support/recording_shell"

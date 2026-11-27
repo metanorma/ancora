@@ -14,6 +14,14 @@ RSpec.describe Ancora::GateLock do
     end
   end
 
+  it "refuses a pin that is not a plain version before writing any Ruby" do
+    chain(FleetFixture::METANORMA_CHAIN) do |c|
+      hostile = %(9"; raise "pwned"; "1)
+      expect { described_class.new(c, graph).gemfile("metanorma-cli" => hostile) }
+        .to raise_error(ArgumentError, /is not a version/)
+    end
+  end
+
   it "pins the whole metanorma chain inventory at exact released versions" do
     chain(FleetFixture::METANORMA_CHAIN) do |c|
       expect(described_class.new(c, graph).pins).to eq(

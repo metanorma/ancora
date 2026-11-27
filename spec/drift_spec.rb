@@ -62,4 +62,15 @@ RSpec.describe Ancora::Drift do
       )
     end
   end
+
+  it "reports a dependency with no constraints key as floorless" do
+    network = {
+      "r1" => { "name" => "A", "main_version" => "1.0.0",
+                "deps" => [{ "name" => "B" }] },
+      "r2" => { "name" => "B", "main_version" => "1.0.0", "deps" => [] },
+    }
+    rep = described_class.new(Ancora::Graph.from_data(network, {})).report
+    expect(rep.floorless.map { |e| [e.from, e.to] }).to eq([%w[A B]])
+    expect(rep.stale_pins).to be_empty
+  end
 end

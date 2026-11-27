@@ -23,7 +23,8 @@ module Ancora
                              keyword_init: true)
 
     TOP_LEVEL_KEYS = %w[name inventory monorepos terminus max_attempts gate canary
-                        promote_approval].freeze
+                        promote_approval dispatch].freeze
+    OWNER_NAME = /\A[A-Za-z0-9][A-Za-z0-9-]*\z/
     INVENTORY_KEYS = %w[orgs roots gems exclude].freeze
     APPROVAL_MODES = %w[manual none].freeze
     CORPUS_ENTRY_KEYS = %w[repo ref documents budget].freeze
@@ -33,8 +34,7 @@ module Ancora
       data = YAML.safe_load(File.read(path),
                             permitted_classes: [], aliases: false)
       unless data.is_a?(Hash)
-        raise ConfigError,
-              "#{path}: expected a mapping at the top level"
+        raise ConfigError, "#{path}: expected a mapping at the top level"
       end
 
       reject_unknown_keys("#{path}:", data.keys, TOP_LEVEL_KEYS)
@@ -47,10 +47,7 @@ module Ancora
       reject_unknown_keys("#{path}: inventory:", inv.keys, INVENTORY_KEYS)
       new(
         name: data.fetch("name") { raise ConfigError, "#{path}: missing name" },
-        orgs: string_array("#{path}: inventory: orgs", inv["orgs"]),
-        roots: string_array("#{path}: inventory: roots", inv["roots"]),
-        gems: string_array("#{path}: inventory: gems", inv["gems"]),
-        exclude: string_array("#{path}: inventory: exclude", inv["exclude"]),
+        inventory: inventory_selection(path, inv),
         monorepos: monorepos(path, data["monorepos"]),
         terminus: string_array("#{path}: terminus", data["terminus"]),
         max_attempts: max_attempts(path, data["max_attempts"]),
@@ -58,7 +55,14 @@ module Ancora
         canary_commands: canary_commands(path, data["canary"]),
         corpora: corpora(path, data.dig("canary", "corpora")),
         promote_approval: promote_approval(path, data["promote_approval"]),
+        dispatch_org: dispatch_org(path, data["dispatch"]),
       )
+    end
+
+    def self.inventory_selection(path, inv)
+      %w[orgs roots gems exclude].to_h do |key|
+        [key.to_sym, string_array("#{path}: inventory: #{key}", inv[key])]
+      end
     end
 
     def self.max_attempts(path, value)
@@ -137,6 +141,22 @@ module Ancora
                       budget: budget, gems: [gem])
     end
 
+    # the owner that dispatch and promotion target instead of the collected
+    # repo's owner; the repo name is kept
+    def self.dispatch_org(path, value)
+      return nil if value.nil?
+      unless value.is_a?(Hash)
+        raise ConfigError, "#{path}: dispatch must be a mapping"
+      end
+
+      reject_unknown_keys("#{path}: dispatch:", value.keys, %w[org])
+      org = value["org"]
+      return org if org.is_a?(String) && OWNER_NAME.match?(org)
+
+      raise ConfigError, "#{path}: dispatch: org must be a GitHub owner name, " \
+                         "got #{org.inspect}"
+    end
+
     def self.promote_approval(path, value)
       return "manual" if value.nil? # the guardrail: no finals without approval
       return value if APPROVAL_MODES.include?(value)
@@ -172,27 +192,30 @@ module Ancora
       end
     end
     private_class_method :reject_unknown_keys, :string_array, :monorepos,
+                         :inventory_selection,
                          :max_attempts, :commands, :canary_commands, :corpora,
                          :corpus_entry, :reject_corpus_conflicts,
-                         :promote_approval
+                         :promote_approval, :dispatch_org
 
     # how many gate attempts a wave gets before the machine halts for
     # humans; nil falls back to the machine default
     attr_reader :name, :orgs, :roots, :gems, :exclude, :monorepos,
-                :max_attempts, :gate_commands, :canary_commands, :corpora
+                :max_attempts, :gate_commands, :canary_commands, :corpora,
+                :dispatch_org
 
     def promote_approval
       @promote_approval
     end
 
-    def initialize(name:, orgs: [], roots: [], gems: [], exclude: [], monorepos: {},
+    def initialize(name:, inventory: {}, monorepos: {},
                    terminus: [], max_attempts: nil, gate_commands: [],
-                   canary_commands: [], corpora: {}, promote_approval: "manual")
+                   canary_commands: [], corpora: {}, promote_approval: "manual",
+                   dispatch_org: nil)
       @name = name
-      @orgs = orgs.freeze
-      @roots = roots.freeze
-      @gems = gems.freeze
-      @exclude = exclude.freeze
+      @orgs = inventory.fetch(:orgs, []).freeze
+      @roots = inventory.fetch(:roots, []).freeze
+      @gems = inventory.fetch(:gems, []).freeze
+      @exclude = inventory.fetch(:exclude, []).freeze
       @monorepos = monorepos.freeze
       @terminus_gems = terminus.freeze
       @max_attempts = max_attempts
@@ -200,6 +223,13 @@ module Ancora
       @canary_commands = canary_commands.freeze
       @corpora = corpora.freeze
       @promote_approval = promote_approval
+      @dispatch_org = dispatch_org
+    end
+
+    def dispatch_repo(repo)
+      return repo unless @dispatch_org && repo
+
+      "#{@dispatch_org}/#{repo.split('/', 2).last}"
     end
 
     # The corpus runs gating the given gems, merged per repo: gems that

@@ -1,0 +1,10 @@
+{
+  "metanorma-sandbox/metanorma-standoc": {
+    "gem": "metanorma-standoc", "repo": "metanorma-sandbox/metanorma-standoc",
+    "main_version": "3.5.1", "released": "3.5.0", "ahead_by": 1
+  },
+  "metanorma-sandbox/metanorma-cli": {
+    "gem": "metanorma-cli", "repo": "metanorma-sandbox/metanorma-cli",
+    "main_version": "1.17.1", "released": "1.17.0", "ahead_by": 1
+  }
+}

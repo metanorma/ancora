@@ -67,6 +67,7 @@ is the gem), lutaml (whole-org fan, no terminus).
 ----
 bundle exec exe/ancora plan --network network.json --delta delta.json
 bundle exec exe/ancora plan --network network.json --seeds metanorma-standoc
+bundle exec exe/ancora plan --network network.json --delta delta.json --semantic
 bundle exec exe/ancora plan --network network.json --chain examples/metanorma.chain.yml
 bundle exec exe/ancora pin --chain examples/metanorma.chain.yml --network network.json --delta delta.json
 bundle exec exe/ancora drift --network network.json --delta delta.json
@@ -86,6 +87,44 @@ main), prerelease floors (the lint class), and unreleased main. `externals`
 checks a chain's floors that point outside its inventory against the rubygems
 oracle: nothing promotes against another chain's prerelease, so a need only a
 prerelease satisfies is the cross-chain release-request case.
+
+== Weekly drift report
+
+`drift-report` turns the same collector data into a per-gem report: commits
+ahead of the latest release, gems whose main VERSION is behind their release,
+latest releases with no `v<version>` git tag (`--tags`, one GitHub API call per
+gem), and the floor violations (floorless edges, stale pins, prerelease floors,
+floors no release satisfies yet). It prints markdown; `--issue OWNER/REPO` also
+files it as one issue per ISO week (a rerun in the same week updates it).
+`.github/workflows/drift-report.yml` runs it every Monday; it reads the
+snapshot from the repository named by the `ANCORA_DATA_REPO` variable.
+
+----
+bundle exec exe/ancora drift-report --network network.json --delta delta.json --tags
+----
+`floors` turns the fixable drift classes (floorless edges, prerelease floors,
+stale pins) into gemspec edits that raise the floor to the dependency's
+RELEASED final; a dependency with no released final is reported as skipped.
+With `--root DIR --apply` it patches `<DIR>/<repo>/**/<gem>.gemspec` in
+place (literal `add_dependency` lines only; anything else is reported as
+unpatchable). It never commits, pushes or releases, and exits 1 while fixes
+remain.
+
+== The gate runner
+
+`ancora gate` runs the gate for the manifest's open attempt: it writes the
+GateLock Gemfile pinning the entire candidate set, compiles it (`bundle lock`,
+`bundle install`), then clones each recipe gem's repo at `main` and runs every
+`gate.commands` command in that checkout. Suite commands use `BUNDLE_GEMFILE`
+pointing at the GateLock Gemfile to resolve the candidate set. Only when all
+suites pass does it run the chain's `canary.commands` once in each
+configured corpus checkout (`documents` in `ANCORA_CORPUS_DOCUMENTS`, the
+corpus `budget` as the timeout). Green only when every step passes; a red
+suite names its gem as suspect, and a red corpus names the gems it gates.
+`--record` writes the verdict to the manifest; private repos clone with
+`GITHUB_TOKEN`/`GH_TOKEN`. Tokens are passed only to git; suite and canary
+commands have publishing credentials scrubbed. A suite or canary command that
+would publish (`gem push`, `rubygems-release`, ...) is refused.
 
 == The step-per-run state machine
 

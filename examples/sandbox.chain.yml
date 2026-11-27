@@ -1,0 +1,16 @@
+# The metanorma sandbox rehearsal chain: the metanorma chain's shape over
+# the metanorma-sandbox org's mirrors, so a rehearsal cuts prereleases
+# (X.Y.Z.pre.alpha.N) without touching metanorma/*. Its network data must
+# be collected from the sandbox mirrors; see examples/sandbox/fixture for
+# the labelled stand-in used by dry runs.
+name: metanorma-sandbox
+inventory:
+  orgs: [metanorma-sandbox]
+  roots: [metanorma-cli]
+terminus: [metanorma-cli]
+gate:
+  commands: [bundle exec rspec]
+canary:
+  commands:
+    - bin/compile-plateau-doc.sh
+promote_approval: manual

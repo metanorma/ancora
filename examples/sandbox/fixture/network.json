@@ -1,0 +1,9 @@
+{
+  "metanorma-sandbox/metanorma-standoc": {
+    "name": "metanorma-standoc", "main_version": "3.5.1", "deps": []
+  },
+  "metanorma-sandbox/metanorma-cli": {
+    "name": "metanorma-cli", "main_version": "1.17.1",
+    "deps": [{ "name": "metanorma-standoc", "constraints": ["~> 3.5.0"] }]
+  }
+}

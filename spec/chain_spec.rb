@@ -197,4 +197,13 @@ RSpec.describe Ancora::Chain do
         .to raise_error(Ancora::Chain::ConfigError, /unknown key/)
     end
   end
+
+  describe "dispatch org" do
+    ["metanorma-sandbox/extra", "-metanorma", ""].each do |org|
+      it "rejects #{org.inspect} as not a bare owner name" do
+        expect { chain("name: metanorma\ndispatch:\n  org: #{org.inspect}\n") { |c| c } }
+          .to raise_error(Ancora::Chain::ConfigError, /dispatch: org must be/)
+      end
+    end
+  end
 end

@@ -69,6 +69,15 @@ RSpec.describe Ancora::Oracle do
                                     "1.99.0")).to be false
     end
 
+    it "tag_status answers tagged/missing, and unknown when GitHub does not answer" do
+      stub_tags("o/ok", ["v1.0.0"])
+      stub_request(:get, "https://api.github.com/repos/o/denied/tags?per_page=100")
+        .to_return(status: 403, body: "{}")
+      expect(oracle.tag_status("o/ok", "1.0.0")).to eq :tagged
+      expect(oracle.tag_status("o/ok", "2.0.0")).to eq :missing
+      expect(oracle.tag_status("o/denied", "1.0.0")).to eq :unknown
+    end
+
     it "reads the latest green run of the rake workflow on main" do
       stub_runs("metanorma/metanorma-cli", [
                   { "name" => "rake", "conclusion" => "success",

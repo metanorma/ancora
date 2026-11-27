@@ -67,4 +67,62 @@ RSpec.describe Ancora::Manifest do
     expect(m.state).to eq "promoted"
     expect(m.promoted_from.index).to eq 1
   end
+
+  describe "loading a hand-edited file" do
+    def load_edited(attempts, state: "gating", cursor: 0)
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "waves.json")
+        data = {
+          "chain" => "metanorma", "state" => state, "wave_cursor" => cursor,
+          "promote_cursor" => 0, "approved" => false, "attempts" => attempts
+        }
+        File.write(path, JSON.generate(data))
+        described_class.load(path)
+      end
+    end
+
+    def attempt(pins, changed: [])
+      { index: 1, pins: pins, created_at: "x", waves: [["metanorma-cli"]],
+        gate_result: "red", changed: changed }
+    end
+
+    it "refuses a final pin, which has no target to renumber from" do
+      expect { load_edited([attempt({ "metanorma-cli" => "1.17.0" })]) }
+        .to raise_error(described_class::Invalid,
+                        /attempt 1: pin 1\.17\.0 .*not a candidate version/)
+    end
+
+    it "refuses changed gems that are not among the pins" do
+      pins = { "metanorma-cli" => "1.17.0.pre.alpha.1" }
+      expect { load_edited([attempt(pins, changed: ["relaton-cli"])]) }
+        .to raise_error(described_class::Invalid,
+                        /attempt 1: changed.*pinned gems/)
+    end
+
+    it "refuses a wave cursor past the attempt's waves" do
+      pins = { "metanorma-cli" => "1.17.0.pre.alpha.1" }
+      expect { load_edited([attempt(pins)], state: "candidate", cursor: 3) }
+        .to raise_error(described_class::Invalid, /wave cursor 3/)
+    end
+
+    it "refuses a gating state with no attempt to gate" do
+      expect { load_edited([], state: "gating") }
+        .to raise_error(described_class::Invalid, /no attempt/)
+    end
+
+    it "refuses a file that is not JSON" do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, "waves.json")
+        File.write(path, "{ not json")
+        expect { described_class.load(path) }
+          .to raise_error(described_class::Invalid, /not JSON/)
+      end
+    end
+
+    it "loads a well-formed attempt" do
+      pins = { "metanorma-cli" => "1.17.0.pre.alpha.1" }
+      reloaded = load_edited([attempt(pins, changed: ["metanorma-cli"])])
+      expect(reloaded.current_attempt.changed).to eq ["metanorma-cli"]
+    end
+  end
 end

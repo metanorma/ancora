@@ -79,8 +79,8 @@ module Ancora
         return promote_wave(manifest, 0)
       end
 
-      return Halt.new(reason: halt_reason(manifest)) if exhausted?(manifest)
       return Gate.new(attempt_index: manifest.current_attempt.index) unless manifest.current_attempt.gate_result == "red"
+      return Halt.new(reason: halt_reason(manifest)) if exhausted?(manifest)
 
       reopen_changed(manifest)
     end
@@ -127,9 +127,12 @@ module Ancora
 
     # a failed gate spawns attempt K+1: fresh alpha counters only for
     # the gems whose main changed since attempt K; the rest keep their
-    # immutable attempt-K pins
+    # immutable attempt-K pins. With no changed gems recorded, a reopen
+    # would pin the same versions again, so the machine stops for humans.
     def reopen_changed(manifest)
       previous = manifest.current_attempt
+      return unchanged_halt(previous) if previous.changed.empty?
+
       outsiders = previous.changed - previous.pins.keys
       unless outsiders.empty?
         raise Error, "changed gem(s) #{outsiders.join(', ')} are not in " \
@@ -143,12 +146,16 @@ module Ancora
       dispatch_wave(manifest, 0)
     end
 
+    def unchanged_halt(attempt)
+      Halt.new(reason: "attempt #{attempt.index} is red and records no " \
+                       "changed gems; nothing to re-attempt")
+    end
+
     def dispatch_wave(manifest, index)
       attempt = manifest.current_attempt
       wave = attempt.waves[index]
       items = wave.map do |gem|
-        Item.new(gem: gem, repo: @graph.nodes[gem]&.repo,
-                 version: attempt.pins[gem])
+        Item.new(gem: gem, repo: repo_of(gem), version: attempt.pins[gem])
       end
       DispatchWave.new(index: index, items: items)
     end
@@ -156,10 +163,13 @@ module Ancora
     def promote_wave(manifest, index)
       attempt = manifest.promoted_from
       items = attempt.waves[index].map do |gem|
-        Item.new(gem: gem, repo: @graph.nodes[gem]&.repo,
-                 version: final(attempt, gem))
+        Item.new(gem: gem, repo: repo_of(gem), version: final(attempt, gem))
       end
       PromoteWave.new(index: index, items: items)
+    end
+
+    def repo_of(gem)
+      @chain.dispatch_repo(@graph.nodes[gem]&.repo)
     end
 
     def fresh_candidate(gem, previous)

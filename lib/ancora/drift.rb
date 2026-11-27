@@ -24,7 +24,7 @@ module Ancora
       edges = edges.select { |e| inventory.include?(e.from) } if @chain
       scope = @chain ? inventory : @graph.nodes.keys
       Report.new(
-        floorless: edges.select { |e| e.constraints.empty? },
+        floorless: edges.select { |e| floorless?(e) },
         stale_pins: edges.filter_map { |e| stale_pin(e) },
         prerelease_floors: edges.select { |e| prerelease_floor?(e) },
         unreleased: scope.filter_map { |gem| unreleased(gem) }.sort_by(&:gem),
@@ -37,8 +37,12 @@ module Ancora
       @inventory ||= @chain.inventory(@graph)
     end
 
+    def floorless?(edge)
+      edge.constraints.nil? || edge.constraints.empty?
+    end
+
     def stale_pin(edge)
-      return if edge.constraints.empty?
+      return if floorless?(edge)
 
       node = @graph.nodes[edge.to]
       main = node&.main_version

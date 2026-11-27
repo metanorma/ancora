@@ -10,16 +10,73 @@ module Ancora
     Attempt = Struct.new(:index, :pins, :created_at, :waves, :gate_result,
                          :changed, keyword_init: true)
 
+    class Invalid < StandardError; end
+
+    NEEDS_ATTEMPT = %w[candidate gating promoted].freeze
+
     attr_reader :chain, :state, :attempts, :wave_cursor, :promote_cursor
 
     def self.load(path, fallback_chain = nil)
-      data = File.file?(path) ? JSON.parse(File.read(path)) : {}
-      new(data.fetch("chain", fallback_chain ||
+      data = File.file?(path) ? parse(path) : {}
+      manifest = new(data.fetch("chain", fallback_chain ||
                      File.basename(File.dirname(path))),
-          data.fetch("state", "planned"), data.fetch("attempts", []),
-          data.fetch("wave_cursor", 0), data.fetch("promote_cursor", 0),
-          data.fetch("approved", false))
+                     data.fetch("state", "planned"), data.fetch("attempts", []),
+                     data.fetch("wave_cursor", 0), data.fetch("promote_cursor", 0),
+                     data.fetch("approved", false))
+      problem = problem_in(manifest)
+      raise Invalid, "#{path}: #{problem}" if problem
+
+      manifest
     end
+
+    def self.parse(path)
+      JSON.parse(File.read(path))
+    rescue JSON::ParserError => e
+      raise Invalid, "#{path}: not JSON (#{e.message.lines.first.strip})"
+    end
+
+    # a hand-edited file fails here in one line, not deep inside a step;
+    # a final pin has no target to renumber from, so it must never dispatch
+    def self.problem_in(manifest)
+      if NEEDS_ATTEMPT.include?(manifest.state) && manifest.attempts.empty?
+        return "no attempt to act on"
+      end
+
+      manifest.attempts.lazy.filter_map { |a| attempt_problem(a) }.first ||
+        cursor_problem(manifest)
+    end
+
+    def self.attempt_problem(attempt)
+      pin_problem(attempt) || changed_problem(attempt)
+    end
+
+    def self.pin_problem(attempt)
+      final = attempt.pins.values.find { |v| !Candidate.candidate?(v) }
+      "attempt #{attempt.index}: pin #{final} is not a candidate version" if final
+    end
+
+    def self.changed_problem(attempt)
+      return "attempt #{attempt.index}: changed must be a list" unless attempt.changed.is_a?(Array)
+
+      stray = attempt.changed - attempt.pins.keys
+      "attempt #{attempt.index}: changed #{stray.join(', ')} not among the pinned gems" unless stray.empty?
+    end
+
+    def self.cursor_problem(manifest)
+      case manifest.state
+      when "candidate"
+        waves = manifest.current_attempt.waves.size
+        "wave cursor #{manifest.wave_cursor} is past the attempt's waves" if manifest.wave_cursor > waves
+      when "promoted"
+        return "no green attempt to promote" unless manifest.promoted_from
+
+        waves = manifest.promoted_from.waves.size
+        "promote cursor #{manifest.promote_cursor} is past the promoted waves" if manifest.promote_cursor > waves
+      end
+    end
+
+    private_class_method :parse, :problem_in, :attempt_problem, :pin_problem,
+                         :changed_problem, :cursor_problem
 
     def initialize(chain, state = "planned", attempts = [], wave_cursor = 0,
                    promote_cursor = 0, approved = false)

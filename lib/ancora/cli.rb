@@ -12,13 +12,21 @@ module Ancora
   #   ancora check metanorma-plugin-lutaml 0.7.54
   #   ancora tag metanorma/metanorma-cli 1.17.0
   #   ancora ci metanorma/metanorma-cli
+  #   ancora floors --network network.json --chain chain.yml [--root DIR --apply]
+  #   ancora gate --chain chain.yml --network network.json --manifest waves.json
   class CLI
-    def self.run(argv)
-      new(argv).run
+    APPLIED = %i[patched unchanged].freeze
+
+    def self.run(argv, shell: Shell.new)
+      new(argv, shell: shell).run
+    rescue Manifest::Invalid, ArgumentError => e
+      warn "ancora: #{e.message}"
+      2
     end
 
-    def initialize(argv)
+    def initialize(argv, shell: Shell.new)
       @argv = argv
+      @shell = shell
     end
 
     def run
@@ -27,12 +35,17 @@ module Ancora
       when "plan" then plan
       when "pin" then return pin
       when "drift" then drift
+      when "drift-report" then return drift_report
       when "externals" then return externals
       when "check" then check
       when "tag" then tag
       when "ci" then ci
       when "step" then return step
       when "approve" then return approve
+      when "policy" then return policy
+      when "notes" then return notes
+      when "floors" then return floors
+      when "gate" then return gate
       else return usage
       end
       0
@@ -41,14 +54,15 @@ module Ancora
     private
 
     def plan
-      options = { delta: nil, seeds: [], chain: nil }
+      options = { delta: nil, seeds: [], chain: nil, semantic: false }
       parse_graph_options(options)
 
       graph = Graph.load(options.fetch(:network), options[:delta])
       chain = load_chain(options)
       scope = options[:seeds].empty? ? :full : :scoped
-      waves = Planner.new(graph, chain: chain).plan(scope: scope,
-                                                    seeds: options[:seeds])
+      planner = Planner.new(graph, chain: chain)
+      waves = planner.plan(scope: scope, seeds: options[:seeds],
+                           semantic: options[:semantic])
       if chain
         terminus = chain.terminus(graph)
         label = terminus ? terminus.join(", ") : "none (fan chain)"
@@ -57,6 +71,12 @@ module Ancora
       puts "scope: #{scope} (#{waves.flatten.size} gems, #{waves.size} waves)"
       waves.each_with_index do |wave, i|
         puts "wave #{i + 1}: #{wave.join(', ')}"
+      end
+      return unless options[:semantic]
+
+      section(planner.floorless_binding(waves.flatten),
+              "floorless edges still ordering the plan") do |e|
+        "#{e.from} -> #{e.to}"
       end
     end
 
@@ -109,6 +129,45 @@ module Ancora
       end
     end
 
+    # the weekly fleet drift report: markdown on stdout; with --issue
+    # also filed as a GitHub issue (needs GITHUB_TOKEN or GH_TOKEN);
+    # --tags adds the git-tag check (one GitHub API call per gem)
+    def drift_report
+      options = { delta: nil, seeds: [], chain: nil }
+      parse_graph_options(options)
+      return usage unless options[:network] && options[:delta]
+
+      missing = options.values_at(:network, :delta).reject { |f| File.file?(f) }
+      unless missing.empty?
+        warn "drift-report: no such file: #{missing.join(', ')}"
+        return 1
+      end
+
+      doc = build_drift_doc(options)
+      puts doc.body
+      options[:issue] ? file_drift_issue(doc, options[:issue]) : 0
+    end
+
+    def build_drift_doc(options)
+      graph = Graph.load(options.fetch(:network), options[:delta])
+      chain = load_chain(options)
+      tags = options[:tags] ? Oracle::Github.new : nil
+      report = FleetDrift.new(graph, chain: chain, tags: tags).report
+      DriftReport.new(report, scope: chain ? "chain #{chain.name}" : DriftReport::WHOLE_FLEET)
+    end
+
+    def file_drift_issue(doc, repo)
+      token = github_token
+      unless token
+        warn "drift-report --issue needs GITHUB_TOKEN or GH_TOKEN"
+        return 1
+      end
+      url = IssueSink.new(repo, token: token)
+        .publish(title: doc.title, body: doc.body, label: DriftReport::LABEL)
+      warn "issue: #{url}"
+      0
+    end
+
     # external-chain needs of a chain: floors pointing outside the
     # inventory, checked against the oracle for satisfying FINALS. A
     # need awaiting release is the cross-chain release-request case.
@@ -135,6 +194,101 @@ module Ancora
       satisfied.size == findings.size ? 0 : 1
     end
 
+    # floor-pin fixing: plans (and with --apply performs) gemspec edits
+    # for floorless, prerelease and stale floors, against released finals.
+    # Edits files under --root only; never commits, pushes or releases.
+    # Exits 1 while fixes remain pending or unpatchable.
+    def floors
+      options = { delta: nil, seeds: [], chain: nil }
+      parse_graph_options(options)
+      return usage if options[:apply] && !options[:root]
+
+      graph = Graph.load(options.fetch(:network), options[:delta])
+      plan = FloorFixer.new(graph, chain: load_chain(options)).plan
+      puts "floor fixes: #{plan.fixes.size} fixable, #{plan.skipped.size} skipped"
+      section(plan.fixes, "fixable") do |f|
+        "#{f.from} -> #{f.to} [#{f.kind}]: #{f.constraints.join(', ').then { |c| c.empty? ? '(none)' : c }} => #{f.proposed.join(', ')}"
+      end
+      section(plan.skipped, "skipped") do |k|
+        "#{k.from} -> #{k.to} [#{k.kind}]: #{k.reason}"
+      end
+      return plan.fixes.empty? ? 0 : 1 unless options[:apply]
+
+      apply_floors(graph, plan, options[:root])
+    end
+
+    def apply_floors(graph, plan, root)
+      outcomes = FloorApplier.new(graph, root: root).apply(plan.fixes)
+      section(outcomes, "applied") do |o|
+        "#{o.fix.from} -> #{o.fix.to}: #{o.status}#{" (#{o.path})" if o.path}"
+      end
+      outcomes.all? { |o| APPLIED.include?(o.status) } ? 0 : 1
+    end
+
+    # canary gating: GateLock full-set compile plus the canary over the
+    # configured corpora, for the manifest's open gating attempt. Records
+    # the verdict only with --record. Exit 0 green, 1 red.
+    def gate
+      options = { delta: nil, seeds: [], chain: nil, workdir: ".ancora-gate" }
+      parse_graph_options(options)
+      chain = load_chain(options)
+      return usage unless chain && options[:manifest]
+
+      manifest = Manifest.load(options[:manifest], chain.name)
+      refusal = gate_refusal(manifest, chain)
+      return refusal if refusal
+
+      graph = Graph.load(options.fetch(:network), options[:delta])
+      verdict = run_gate(chain, graph, manifest, options)
+      render_verdict(verdict, manifest.current_attempt.index)
+      record_verdict(manifest, verdict, options[:manifest]) if options[:record]
+      verdict.green? ? 0 : 1
+    rescue GateRun::Refused => e
+      warn e.message
+      2
+    end
+
+    # exit code 2 when the manifest is not this chain's open gating attempt
+    def gate_refusal(manifest, chain)
+      if manifest.chain != chain.name
+        warn "manifest belongs to chain #{manifest.chain}, not #{chain.name}"
+        return 2
+      end
+      return if manifest.state == "gating" && manifest.current_attempt
+
+      warn "manifest is not in the gating state (state: #{manifest.state})"
+      2
+    end
+
+    def run_gate(chain, graph, manifest, options)
+      findings = options[:externals] ? external_findings(chain, graph) : []
+      GateRun.new(chain: chain, graph: graph, workdir: options[:workdir],
+                  shell: @shell, token: github_token)
+        .call(manifest.current_attempt.pins, externals: findings)
+    end
+
+    # an empty variable is no token: it would send a blank auth header
+    def github_token
+      [ENV.fetch("GITHUB_TOKEN", nil), ENV.fetch("GH_TOKEN", nil)]
+        .find { |token| !token.to_s.empty? }
+    end
+
+    def record_verdict(manifest, verdict, path)
+      manifest.record_gate!(verdict.result, verdict.suspects)
+      manifest.write(path)
+    end
+
+    def render_verdict(verdict, index)
+      puts "gate attempt #{index}: #{verdict.result.upcase}"
+      verdict.steps.each do |s|
+        puts "  [#{s.status}] #{s.name}"
+        puts s.detail.gsub(/^/, "      ") unless s.status == "ok" || s.detail.empty?
+      end
+      return if verdict.suspects.empty?
+
+      puts "  suspects (gems gated by failing corpora): #{verdict.suspects.join(', ')}"
+    end
+
     def section(items, title)
       puts
       puts "== #{title} (#{items.size})"
@@ -158,7 +312,6 @@ module Ancora
     def step
       options = { delta: nil, seeds: [], chain: nil, manifest: nil, format: "text" }
       parse_graph_options(options)
-
       chain = load_chain(options)
       return 1 unless chain
 
@@ -269,6 +422,33 @@ module Ancora
       0
     end
 
+    def policy
+      options = { next_version: nil }
+      OptionParser.new do |o|
+        o.on("--next-version V") { |v| options[:next_version] = v }
+      end.parse!(@argv)
+      root = @argv.shift
+      return usage unless root
+
+      findings = Policy.new(File.expand_path(root),
+                            next_version: options[:next_version]).check
+      findings.each { |f| puts "#{f.rule}: #{f.message}" }
+      puts "policy: #{findings.empty? ? 'ok' : "#{findings.size} violation(s)"}"
+      findings.empty? ? 0 : 1
+    end
+
+    def notes
+      options = {}
+      OptionParser.new do |o|
+        o.on("--prs PATH") { |v| options[:prs] = v }
+        o.on("--version V") { |v| options[:version] = v }
+      end.parse!(@argv)
+      return usage unless options[:prs] && options[:version]
+
+      puts ReleaseNotes.new(JSON.parse(File.read(options[:prs]))).render(options[:version])
+      0
+    end
+
     def tag
       repo = @argv.shift
       version = @argv.shift
@@ -303,6 +483,13 @@ module Ancora
         o.on("--manifest PATH") { |v| options[:manifest] = v }
         o.on("--format F") { |v| options[:format] = v }
         o.on("--externals") { |v| options[:externals] = v }
+        o.on("--tags") { |v| options[:tags] = v }
+        o.on("--issue OWNER/REPO") { |v| options[:issue] = v }
+        o.on("--semantic") { |v| options[:semantic] = v }
+        o.on("--root PATH") { |v| options[:root] = v }
+        o.on("--apply") { |v| options[:apply] = v }
+        o.on("--workdir PATH") { |v| options[:workdir] = v }
+        o.on("--record") { |v| options[:record] = v }
       end.parse!(@argv)
     end
 
@@ -313,15 +500,20 @@ module Ancora
     end
 
     def usage
-      warn "usage: ancora plan --network PATH [--delta PATH] [--chain chain.yml] [--seeds a,b]"
+      warn "usage: ancora plan --network PATH [--delta PATH] [--chain chain.yml] [--seeds a,b] [--semantic]"
       warn "       ancora pin --chain chain.yml --network PATH [--delta PATH]"
       warn "       ancora drift --network PATH [--delta PATH] [--chain chain.yml]"
+      warn "       ancora drift-report --network PATH --delta PATH [--chain chain.yml] [--tags] [--issue OWNER/REPO]"
       warn "       ancora externals --chain chain.yml --network PATH [--delta PATH]"
       warn "       ancora check GEM VERSION"
       warn "       ancora tag OWNER/REPO VERSION"
       warn "       ancora ci OWNER/REPO [BRANCH]"
       warn "       ancora step --chain chain.yml --network PATH --delta PATH [--manifest PATH]"
       warn "       ancora approve --manifest PATH"
+      warn "       ancora policy GEM_CHECKOUT [--next-version X.Y.Z]"
+      warn "       ancora notes --prs PRS.json --version X.Y.Z"
+      warn "       ancora floors --network PATH [--delta PATH] [--chain chain.yml] [--root CHECKOUTS --apply]"
+      warn "       ancora gate --chain chain.yml --network PATH [--delta PATH] --manifest PATH [--workdir DIR] [--externals] [--record]"
       1
     end
   end

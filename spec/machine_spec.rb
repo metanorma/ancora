@@ -137,26 +137,63 @@ RSpec.describe Ancora::Machine do
     )
   end
 
-  it "halts for humans at max_attempts" do
+  it "halts instead of reopening identical pins when no gem changed" do
     stub_all_versions
     machine.step(manifest, targets)
-    2.times do
-      publish("metanorma-document", ["0.5.2.pre.alpha.1"])
-      publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
-      machine.step(manifest)
-      machine.step(manifest)
-      manifest.record_gate!("red")
-      machine.step(manifest)
-    end
     publish("metanorma-document", ["0.5.2.pre.alpha.1"])
     publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
     machine.step(manifest)
     machine.step(manifest)
     manifest.record_gate!("red")
+
+    action = machine.step(manifest)
+    expect(action).to be_a(described_class::Halt)
+    expect(action.reason).to include("attempt 1 is red and records no changed gems")
+    expect(manifest.current_attempt.index).to eq 1
+  end
+
+  it "halts for humans at max_attempts" do
+    stub_all_versions
+    machine.step(manifest, targets)
+    2.times do |i|
+      publish("metanorma-document", ["0.5.2.pre.alpha.#{i + 1}"])
+      publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+      machine.step(manifest)
+      machine.step(manifest)
+      manifest.record_gate!("red", ["metanorma-document"])
+      machine.step(manifest)
+    end
+    publish("metanorma-document", ["0.5.2.pre.alpha.3"])
+    publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+    machine.step(manifest)
+    machine.step(manifest)
+    manifest.record_gate!("red", ["metanorma-document"])
     action = machine.step(manifest)
     expect(action).to be_a(described_class::Halt)
     expect(action.reason).to include("3 attempts")
     expect(action.reason).to include("max 3")
+  end
+
+  context "with max_attempts 2" do
+    let(:chain_yaml) { "#{FleetFixture::METANORMA_CHAIN}max_attempts: 2\n" }
+
+    it "gates the last allowed attempt before it halts" do
+      stub_all_versions
+      machine.step(manifest, targets)
+      publish("metanorma-document", ["0.5.2.pre.alpha.1"])
+      publish("metanorma-standoc", ["3.5.1.pre.alpha.1"])
+      machine.step(manifest)
+      machine.step(manifest)
+      manifest.record_gate!("red", ["metanorma-document"])
+      machine.step(manifest)
+      publish("metanorma-document", ["0.5.2.pre.alpha.2"])
+      machine.step(manifest)
+      machine.step(manifest)
+
+      action = machine.step(manifest)
+      expect(action).to be_a(described_class::Gate)
+      expect(action.attempt_index).to eq 2
+    end
   end
 
   it "refuses a red gate naming gems outside the attempt's pins" do
@@ -306,5 +343,25 @@ RSpec.describe Ancora::Machine do
     m = described_class.new(chain: chain, graph: graph,
                             oracle: Ancora::Oracle::Rubygems.new)
     expect(m.step(manifest)).to be_a(described_class::Done)
+  end
+
+  describe "dispatch org" do
+    context "when the chain declares one" do
+      let(:chain_yaml) do
+        "#{FleetFixture::METANORMA_CHAIN}dispatch:\n  org: metanorma-sandbox\n"
+      end
+
+      it "retargets dispatch into the configured org, keeping the repo name" do
+        stub_all_versions
+        expect(machine.step(manifest, targets).items.map(&:repo))
+          .to eq(["metanorma-sandbox/metanorma-document"])
+      end
+    end
+
+    it "dispatches to the collected repo when the chain declares no org" do
+      stub_all_versions
+      expect(machine.step(manifest, targets).items.map(&:repo))
+        .to eq(["metanorma/metanorma-document"])
+    end
   end
 end

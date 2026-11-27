@@ -1,0 +1,48 @@
+# Weekly fleet drift report: runs `ancora drift-report` over the collector
+# snapshot and files (or updates) one issue per ISO week in this repo.
+#
+# The snapshot (network.json, delta.json) is produced by the collector,
+# which lives outside this repo; set the repository variable
+# ANCORA_DATA_REPO to the repo that publishes it under data/.
+name: drift-report
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# one report run at a time, so a manual run cannot race the schedule into
+# a duplicate weekly issue
+concurrency:
+  group: drift-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ANCORA_DATA_REPO }}
+          token: ${{ secrets.METANORMA_CI_PAT_TOKEN }}
+          path: fleet-data
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: file the weekly drift report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          bundle exec exe/ancora drift-report \
+            --network fleet-data/data/network.json \
+            --delta fleet-data/data/delta.json \
+            --tags --issue "$GITHUB_REPOSITORY" > drift-report.md
